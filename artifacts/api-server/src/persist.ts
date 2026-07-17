@@ -65,6 +65,14 @@ function enqueue(key: string, op: () => Promise<void>): void {
   writeQueues.set(key, next);
 }
 
+/**
+ * Wait for all pending write-queue operations to settle.
+ * Useful in tests to ensure DB writes are flushed before reading back.
+ */
+export async function drainWriteQueue(): Promise<void> {
+  await Promise.all([...writeQueues.values()]);
+}
+
 // ── Schema bootstrap ──────────────────────────────────────────────────────────
 
 /**
