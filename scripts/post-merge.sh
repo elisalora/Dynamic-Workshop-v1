@@ -1,4 +1,5 @@
 #!/bin/bash
 set -e
-pnpm install --frozen-lockfile
-pnpm --filter db push
+
+# Install / update all workspace dependencies (no frozen-lockfile so new packages merge cleanly)
+pnpm install
