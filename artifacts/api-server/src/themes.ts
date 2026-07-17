@@ -57,7 +57,8 @@ export async function runThemePass(): Promise<void> {
   let raw = "";
   try {
     raw = await callAnthropic(THEME_SYSTEM, `Workshop table digests:\n\n${digest}`);
-    const parsed = JSON.parse(raw) as { candidates?: ThemeCandidate[] };
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const parsed = JSON.parse(cleaned) as { candidates?: ThemeCandidate[] };
 
     const incoming = Array.isArray(parsed.candidates) ? parsed.candidates : [];
 

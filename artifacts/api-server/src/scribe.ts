@@ -128,7 +128,8 @@ async function runScribeForTable(tableId: string): Promise<void> {
   let raw = "";
   try {
     raw = await callAnthropic(SCRIBE_SYSTEM, userContent);
-    const parsed = JSON.parse(raw) as { summary?: string; ops?: unknown[] };
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const parsed = JSON.parse(cleaned) as { summary?: string; ops?: unknown[] };
 
     table.summary = parsed.summary ?? table.summary;
     const ops = Array.isArray(parsed.ops) ? parsed.ops : [];
