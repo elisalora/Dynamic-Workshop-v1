@@ -901,3 +901,5 @@
 {"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784324579291}
 {"kind":"scribe","table":"T1","summary":"Reiteration of concern about optimizing for wrong metrics, already captured on board.","opCount":0,"ts":1784324602786}
 {"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784324639307}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-perspective","text":"Start from the user's perspective"},"ts":1784324648018}
+{"kind":"scribe","table":"T1","summary":"Reframing the conversation around starting with the user's perspective.","opCount":1,"ts":1784324648018}
