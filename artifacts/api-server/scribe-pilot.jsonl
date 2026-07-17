@@ -984,3 +984,35 @@
 {"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784326019969}
 {"kind":"op","table":"T1","op":{"op":"emphasize","target":"ownership-governance"},"ts":1784326031035}
 {"kind":"scribe","table":"T1","summary":"Recurring focus on governance and decision-making authority within the ownership question.","opCount":1,"ts":1784326031039}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784326380048}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"ux-first"},"ts":1784326388260}
+{"kind":"scribe","table":"T1","summary":"Reaffirming the need to ground decisions in user perspective.","opCount":1,"ts":1784326388260}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784326439923}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"ux-first","text":"Need to separate and address problems individually rather than conflating them"},"ts":1784326479398}
+{"kind":"scribe","table":"T1","summary":"Participant identifies that multiple distinct problems are being treated as a single issue.","opCount":1,"ts":1784326479398}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784326499979}
+{"kind":"scribe","table":"T1","summary":"Reiteration of the importance of prioritizing user experience before scaling efforts.","opCount":0,"ts":1784326523045}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784326559958}
+{"kind":"scribe","table":"T1","summary":"Reiterating the fundamental tension between speed and quality in development.","opCount":0,"ts":1784326568380}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784326619942}
+{"kind":"scribe","table":"T1","summary":"Reiterating the importance of embedding feedback mechanisms directly into the process design.","opCount":0,"ts":1784326658355}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784326679944}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"onboarding-friction","text":"Data suggests most users drop off at the onboarding step"},"ts":1784326703580}
+{"kind":"scribe","table":"T1","summary":"Data confirms onboarding is the primary user drop-off point.","opCount":1,"ts":1784326703581}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784326739952}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"ownership-governance","text":"Recurring question: who holds decision-making authority?"},"ts":1784326749643}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"ownership-governance"},"ts":1784326749643}
+{"kind":"scribe","table":"T1","summary":"Recurring focus on fundamental governance question of who holds decision-making authority.","opCount":2,"ts":1784326749643}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784326800003}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"ownership-governance"},"ts":1784326839534}
+{"kind":"scribe","table":"T1","summary":"Acknowledging the central tension around centralized versus distributed decision-making approaches.","opCount":1,"ts":1784326839535}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784326859986}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"ux-first","text":"Test assumptions without building the whole thing"},"ts":1784326885316}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"action","text":"Design experiment to validate core assumption before full build"},"ts":1784326885317}
+{"kind":"scribe","table":"T1","summary":"Discussion shifts toward testing assumptions incrementally rather than full implementation.","opCount":2,"ts":1784326885317}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784326919964}
+{"kind":"op","table":"T1","op":{"op":"add_cluster","id":"communication-gaps","label":"Communication Gaps"},"ts":1784326929630}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"communication-gaps","text":"Problem may be communication, not process"},"ts":1784326929633}
+{"kind":"op","table":"T1","op":{"op":"link","from":"communication-gaps","to":"ownership-governance","kind":"tension"},"ts":1784326929633}
+{"kind":"scribe","table":"T1","summary":"Questioning whether the root issue is communication rather than process-related.","opCount":3,"ts":1784326929634}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784326980045}
