@@ -8,8 +8,8 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: #0a0a0a;
-    color: #e8e0c8;
+    background: #f5f0e8;
+    color: #1a1410;
     font-family: 'Courier New', Courier, monospace;
     min-height: 100vh;
     display: flex;
@@ -23,7 +23,7 @@
   #unlock-overlay {
     position: fixed;
     inset: 0;
-    background: #0a0a0a;
+    background: #f5f0e8;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -34,12 +34,12 @@
   }
   #unlock-overlay h2 {
     font-size: 1.25rem;
-    color: #6b6050;
+    color: #8b6a40;
     letter-spacing: 0.2em;
     text-transform: uppercase;
   }
   #unlock-overlay p {
-    color: #4a4038;
+    color: #a08060;
     font-size: 0.9rem;
     letter-spacing: 0.1em;
   }
@@ -66,27 +66,27 @@
     display: grid;
     grid-template-columns: repeat(22, 1fr);
     gap: 3px;
-    background: #111;
+    background: #d4c4a8;
     padding: 8px;
     border-radius: 6px;
-    box-shadow: 0 0 60px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12), inset 0 0 12px rgba(0,0,0,0.06);
     width: 100%;
     max-width: 900px;
   }
 
   .tile {
     aspect-ratio: 0.65;
-    background: #1a1510;
+    background: #faf7f2;
     border-radius: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: clamp(0.7rem, 2.2vw, 1.3rem);
     font-weight: 700;
-    color: #e8e0c8;
+    color: #1a1410;
     position: relative;
     overflow: hidden;
-    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
   }
 
   /* Horizontal split line */
@@ -96,7 +96,7 @@
     left: 0; right: 0;
     top: 50%;
     height: 1px;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.12);
     pointer-events: none;
   }
 
@@ -106,7 +106,7 @@
 
   @keyframes flip {
     0%   { transform: scaleY(1); }
-    50%  { transform: scaleY(0); background: #2a2010; }
+    50%  { transform: scaleY(0); background: #e8dfc8; }
     100% { transform: scaleY(1); }
   }
 
@@ -120,7 +120,7 @@
 
   .prompt-item {
     font-size: clamp(0.85rem, 2vw, 1.15rem);
-    color: #7a6a50;
+    color: #7a6040;
     line-height: 1.6;
     padding: 0.4rem 0;
     opacity: 0;
@@ -133,7 +133,7 @@
   }
   .prompt-item::before {
     content: '→ ';
-    color: #4a3a28;
+    color: #b08050;
   }
 
   /* ── Status ─────────────────────────── */
@@ -141,7 +141,7 @@
     font-size: 0.65rem;
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: #3a3028;
+    color: #a09070;
     text-align: center;
   }
 </style>
