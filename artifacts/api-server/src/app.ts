@@ -25,11 +25,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static HTML pages from /public
+// Serve static HTML pages — mounted at /api so the proxy prefix is handled
 const publicDir = path.resolve(process.cwd(), "public");
-app.use(express.static(publicDir));
+app.use("/api", express.static(publicDir));
 
-// Health + API routes
+// Health + API routes (router also mounted at /api)
 app.use("/api", router);
 
 export default app;

@@ -124,7 +124,6 @@ function handleConsole(ws: WebSocket): void {
       const candidateId = String(msg["candidateId"] ?? "");
 
       if (msg["type"] === "reveal" || msg["type"] === "reveal_custom") {
-        const { themeCandidates, broadcastBoard } = require("./state.js") as typeof import("./state.js");
         const candidate = themeCandidates.get(candidateId);
         if (!candidate || candidate.state === "revealed") return;
 
@@ -138,7 +137,6 @@ function handleConsole(ws: WebSocket): void {
         broadcastBoard({ type: "reveal", text, prompts: candidate.seedPrompts });
         broadcastConsole(consoleSnapshot());
       } else if (msg["type"] === "dismiss") {
-        const { themeCandidates } = require("./state.js") as typeof import("./state.js");
         const candidate = themeCandidates.get(candidateId);
         if (!candidate) return;
         candidate.state = "dismissed";
