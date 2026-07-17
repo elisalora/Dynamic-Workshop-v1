@@ -54,3 +54,6 @@
 {"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784318429287}
 {"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784318434275}
 {"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784318439280}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784318444289}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784318449281}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784318454278}
