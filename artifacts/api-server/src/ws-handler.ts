@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { URL } from "node:url";
 import {
   getOrCreateTable,
+  sessionConfigs,
   podSockets,
   consoleSockets,
   boardSockets,
@@ -64,14 +65,23 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
   }
 
   logger.info({ tableId }, "Pod connected");
-  const table = getOrCreateTable(tableId, topic);
+  // Use session config name/questions if this table was pre-created
+  const cfg = sessionConfigs.get(tableId);
+  const resolvedTopic = cfg?.name ?? topic;
+  const table = getOrCreateTable(tableId, resolvedTopic);
   podSockets.set(tableId, ws);
 
   // Connect Deepgram ASR
   connectDeepgram(tableId);
 
-  // Send full canvas state on (re)connect
-  ws.send(JSON.stringify({ type: "canvas_state", board: table.board, summary: table.summary }));
+  // Send full canvas state + session questions on (re)connect
+  ws.send(JSON.stringify({
+    type: "canvas_state",
+    board: table.board,
+    summary: table.summary,
+    questions: cfg?.questions ?? [],
+    sessionName: resolvedTopic,
+  }));
 
   // Broadcast updated console
   broadcastConsole(consoleSnapshot());

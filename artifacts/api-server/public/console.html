@@ -17,7 +17,6 @@
     --accent: #2563eb;
     --accent2: #d97706;
     --green: #16a34a;
-    --red: #dc2626;
     --orange: #ea580c;
     --purple: #7c3aed;
   }
@@ -29,7 +28,7 @@
     font-size: 14px;
     min-height: 100vh;
     padding: 1rem;
-    max-width: 800px;
+    max-width: 820px;
     margin: 0 auto;
   }
 
@@ -55,32 +54,235 @@
     align-items: center;
     gap: 0.4rem;
   }
-  .conn-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-  }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
   .conn-dot.live { background: var(--green); animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-  /* ── Section headers ─────────────────── */
+  /* ── Section headers ────────────────────────── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
   .section-title {
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.15em;
     color: var(--muted);
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid var(--border);
   }
-
-  /* ── Table cards ─────────────────────── */
-  #tables-section { margin-bottom: 1.75rem; }
-  #tables-grid {
+  .btn-new-group {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
     display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
+    align-items: center;
+    gap: 0.35rem;
+    transition: opacity 0.15s;
   }
+  .btn-new-group:hover { opacity: 0.85; }
+
+  /* ── New Group form ─────────────────────────── */
+  #groups-section { margin-bottom: 1.75rem; }
+  #new-group-form {
+    display: none;
+    background: var(--surface);
+    border: 1.5px solid var(--accent);
+    border-radius: 8px;
+    padding: 1.1rem 1.1rem 1rem;
+    margin-bottom: 0.75rem;
+    animation: slideDown 0.2s ease-out;
+  }
+  #new-group-form.open { display: block; }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+  .form-row { margin-bottom: 0.85rem; }
+  .form-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+  .form-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .form-input:focus { outline: none; border-color: var(--accent); }
+
+  #questions-list { display: flex; flex-direction: column; gap: 0.45rem; }
+  .question-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+  .question-row .form-input { flex: 1; }
+  .btn-remove-q {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 28px; height: 28px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s, color 0.1s;
+  }
+  .btn-remove-q:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+  .btn-add-q {
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 5px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    margin-top: 0.35rem;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-add-q:hover { border-color: var(--accent); color: var(--accent); }
+
+  .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    align-items: center;
+  }
+  .btn-create {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-create:hover { opacity: 0.85; }
+  .btn-create:disabled { opacity: 0.5; cursor: default; }
+  .btn-cancel {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  #form-error { color: #dc2626; font-size: 0.8rem; flex: 1; }
+
+  /* ── Waiting session card ───────────────────── */
+  .waiting-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.6rem;
+    animation: slideDown 0.25s ease-out;
+  }
+  .waiting-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+  }
+  .waiting-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    flex: 1;
+  }
+  .waiting-chip {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.18rem 0.5rem;
+    border-radius: 100px;
+    background: #fef3c7;
+    color: var(--accent2);
+    flex-shrink: 0;
+  }
+  .waiting-id {
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-family: monospace;
+    flex-shrink: 0;
+  }
+  .waiting-questions {
+    margin-bottom: 0.75rem;
+  }
+  .wq-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+  .wq-item {
+    font-size: 0.8rem;
+    color: var(--text);
+    padding-left: 0.9rem;
+    position: relative;
+    line-height: 1.45;
+    margin-bottom: 0.15rem;
+  }
+  .wq-item::before { content: '?'; position: absolute; left: 0; color: var(--accent); font-weight: 700; font-size: 0.65rem; top: 0.1em; }
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.65rem;
+  }
+  .link-url {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: monospace;
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .btn-copy {
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-copy:hover { background: #dbeafe; border-color: var(--accent); color: var(--accent); }
+  .btn-copy.copied { background: #dcfce7; border-color: var(--green); color: var(--green); }
+
+  /* ── Active table cards ─────────────────────── */
+  #tables-grid { display: flex; flex-direction: column; gap: 0.6rem; }
 
   .table-card {
     background: var(--surface);
@@ -116,9 +318,9 @@
     color: var(--muted);
     flex-shrink: 0;
   }
-  .status-chip.flowing  { background: #dcfce7; color: var(--green); }
-  .status-chip.circling { background: #ffedd5; color: var(--orange); }
-  .status-chip.quiet    { background: var(--surface2); color: var(--muted); }
+  .status-chip.flowing    { background: #dcfce7; color: var(--green); }
+  .status-chip.circling   { background: #ffedd5; color: var(--orange); }
+  .status-chip.quiet      { background: var(--surface2); color: var(--muted); }
   .status-chip.converging { background: #ede9fe; color: var(--purple); }
 
   .sparkline-wrap {
@@ -136,7 +338,6 @@
     border-radius: 2px 2px 0 0;
     min-height: 2px;
   }
-
   .table-summary-text {
     font-size: 0.8rem;
     color: var(--muted);
@@ -147,10 +348,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .table-card.expanded .table-summary-text {
-    white-space: normal;
-  }
-
+  .table-card.expanded .table-summary-text { white-space: normal; }
   .chevron {
     flex-shrink: 0;
     color: var(--muted);
@@ -159,20 +357,15 @@
   }
   .table-card.expanded .chevron { transform: rotate(180deg); }
 
-  /* ── Expanded detail panel ───────────── */
   .table-detail {
     display: none;
     padding: 0 1rem 1rem;
     border-top: 1px solid var(--border);
-    margin-top: 0;
     animation: slideDown 0.2s ease-out;
   }
   .table-card.expanded .table-detail { display: block; }
-  @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
-  .detail-section {
-    margin-top: 0.85rem;
-  }
+  .detail-section { margin-top: 0.85rem; }
   .detail-label {
     font-size: 0.65rem;
     text-transform: uppercase;
@@ -181,152 +374,44 @@
     margin-bottom: 0.4rem;
     font-weight: 600;
   }
-  .cluster-block {
-    margin-bottom: 0.6rem;
-  }
-  .cluster-name {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--accent);
-    margin-bottom: 0.25rem;
-  }
-  .idea-row {
-    font-size: 0.8rem;
-    color: var(--text);
-    padding-left: 0.9rem;
-    line-height: 1.5;
-    position: relative;
-  }
+  .cluster-block { margin-bottom: 0.6rem; }
+  .cluster-name { font-weight: 600; font-size: 0.85rem; color: var(--accent); margin-bottom: 0.25rem; }
+  .idea-row { font-size: 0.8rem; color: var(--text); padding-left: 0.9rem; line-height: 1.5; position: relative; }
   .idea-row::before { content: '–'; position: absolute; left: 0; color: var(--muted); }
+  .quote-row { font-size: 0.8rem; color: var(--text); font-style: italic; border-left: 2px solid var(--border); padding-left: 0.6rem; margin-bottom: 0.35rem; line-height: 1.4; }
+  .flag-row { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--surface2); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem; margin: 0.2rem 0.2rem 0 0; }
+  .flag-kind { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+  .synthesis-row { font-size: 0.82rem; background: #eff6ff; border-left: 3px solid var(--accent); padding: 0.5rem 0.75rem; border-radius: 0 4px 4px 0; line-height: 1.5; color: var(--text); }
 
-  .quote-row {
-    font-size: 0.8rem;
-    color: var(--text);
-    font-style: italic;
-    border-left: 2px solid var(--border);
-    padding-left: 0.6rem;
-    margin-bottom: 0.35rem;
-    line-height: 1.4;
-  }
-
-  .flag-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    background: var(--surface2);
-    border-radius: 4px;
-    padding: 0.2rem 0.55rem;
-    font-size: 0.75rem;
-    margin: 0.2rem 0.2rem 0 0;
-  }
-  .flag-kind {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .synthesis-row {
-    font-size: 0.82rem;
-    background: #eff6ff;
-    border-left: 3px solid var(--accent);
-    padding: 0.5rem 0.75rem;
-    border-radius: 0 4px 4px 0;
-    line-height: 1.5;
-    color: var(--text);
-  }
-
-  /* ── Candidates ──────────────────────── */
+  /* ── Candidates ─────────────────────────────── */
   #candidates-section { margin-bottom: 1.75rem; }
   #candidates-list { display: flex; flex-direction: column; gap: 0.75rem; }
 
-  .candidate-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.85rem 1rem;
-    animation: fadeIn 0.3s ease-out;
-  }
+  .candidate-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 1rem; animation: fadeIn 0.3s ease-out; }
   .candidate-card.high { border-color: var(--accent2); }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; } }
 
-  .cand-header {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-bottom: 0.5rem;
-  }
-  .cand-topic {
-    font-weight: 700;
-    font-size: 0.95rem;
-    flex: 1;
-  }
-  .conf-badge {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    padding: 0.15rem 0.5rem;
-    border-radius: 100px;
-    font-weight: 700;
-  }
+  .cand-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+  .cand-topic { font-weight: 700; font-size: 0.95rem; flex: 1; }
+  .conf-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.15rem 0.5rem; border-radius: 100px; font-weight: 700; }
   .conf-badge.low    { background: #f1f3f7; color: var(--muted); }
   .conf-badge.medium { background: #ffedd5; color: var(--orange); }
   .conf-badge.high   { background: #fef3c7; color: var(--accent2); }
 
-  .cand-rationale {
-    font-size: 0.8rem;
-    color: var(--muted);
-    margin-bottom: 0.6rem;
-    line-height: 1.4;
-  }
+  .cand-rationale { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.6rem; line-height: 1.4; }
+  .evidence-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.7rem; }
+  .evidence-chip { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 0.25rem 0.6rem; font-size: 0.7rem; color: var(--text); }
+  .evidence-chip .ev-table { color: var(--accent); font-weight: 700; margin-right: 0.3em; }
+  .cand-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-  .evidence-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-bottom: 0.7rem;
-  }
-  .evidence-chip {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 0.25rem 0.6rem;
-    font-size: 0.7rem;
-    color: var(--text);
-  }
-  .evidence-chip .ev-table {
-    color: var(--accent);
-    font-weight: 700;
-    margin-right: 0.3em;
-  }
-
-  .cand-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .btn {
-    border: none;
-    border-radius: 5px;
-    padding: 0.4rem 0.85rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-  }
+  .btn { border: none; border-radius: 5px; padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
   .btn:hover { opacity: 0.85; }
   .btn:active { transform: scale(0.97); }
-  .btn-reveal { background: var(--accent); color: #000; }
-  .btn-edit   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-reveal  { background: var(--accent); color: #fff; }
+  .btn-edit    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-dismiss { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 
-  .no-candidates {
-    color: var(--muted);
-    font-size: 0.85rem;
-    padding: 1rem 0;
-    font-style: italic;
-  }
-
+  .no-candidates { color: var(--muted); font-size: 0.85rem; padding: 1rem 0; font-style: italic; }
   .candidate-card.revealed { opacity: 0.4; pointer-events: none; }
   .candidate-card.dismissed { display: none; }
 </style>
@@ -341,21 +426,51 @@
   </div>
 </header>
 
-<section id="tables-section">
-  <div class="section-title">Tables</div>
-  <div id="tables-grid"><p style="color:var(--muted);font-style:italic;font-size:0.85rem;">No tables connected yet.</p></div>
+<!-- ── Groups (waiting + active) ───────────────────── -->
+<section id="groups-section">
+  <div class="section-header">
+    <div class="section-title">Discussion Groups</div>
+    <button class="btn-new-group" id="btn-new-group">＋ New Group</button>
+  </div>
+
+  <!-- Creation form -->
+  <div id="new-group-form">
+    <div class="form-row">
+      <label class="form-label" for="group-name">Group name</label>
+      <input class="form-input" id="group-name" type="text" placeholder="e.g. Future of Work, Table 3…" autocomplete="off"/>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Discussion questions <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
+      <div id="questions-list"></div>
+      <button class="btn-add-q" id="btn-add-q">＋ Add a question</button>
+    </div>
+    <div class="form-actions">
+      <button class="btn-create" id="btn-create">Create &amp; generate link</button>
+      <button class="btn-cancel" id="btn-cancel">Cancel</button>
+      <span id="form-error"></span>
+    </div>
+  </div>
+
+  <!-- Waiting sessions -->
+  <div id="waiting-list"></div>
+
+  <!-- Active tables -->
+  <div id="tables-grid"></div>
 </section>
 
+<!-- ── Spawn Candidates ─────────────────────────────── -->
 <section id="candidates-section">
-  <div class="section-title">Spawn Candidates</div>
+  <div class="section-header">
+    <div class="section-title">Spawn Candidates</div>
+  </div>
   <div id="candidates-list"><p class="no-candidates">No cross-table themes detected yet.</p></div>
 </section>
 
 <script>
 (function() {
   let ws = null;
-  let lastState = null;
 
+  // ── WebSocket ──────────────────────────────────────────
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const base  = location.pathname.replace(/\/[^/]*$/, '');
@@ -365,14 +480,12 @@
       document.getElementById('conn-dot').className = 'conn-dot live';
       document.getElementById('conn-text').textContent = 'Live';
     });
-
     ws.addEventListener('message', (evt) => {
       try {
         const msg = JSON.parse(evt.data);
         if (msg.type === 'state') renderState(msg);
       } catch {}
     });
-
     ws.addEventListener('close', () => {
       document.getElementById('conn-dot').className = 'conn-dot';
       document.getElementById('conn-text').textContent = 'Reconnecting…';
@@ -384,18 +497,152 @@
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   }
 
-  // ── Tables ──────────────────────────────────────────────
+  // ── New Group form ─────────────────────────────────────
+  const form      = document.getElementById('new-group-form');
+  const qList     = document.getElementById('questions-list');
+  const btnToggle = document.getElementById('btn-new-group');
+  const btnAdd    = document.getElementById('btn-add-q');
+  const btnCreate = document.getElementById('btn-create');
+  const btnCancel = document.getElementById('btn-cancel');
+  const errEl     = document.getElementById('form-error');
+  const nameEl    = document.getElementById('group-name');
+
+  btnToggle.addEventListener('click', () => {
+    const opening = !form.classList.contains('open');
+    form.classList.toggle('open', opening);
+    btnToggle.textContent = opening ? '✕ Close' : '＋ New Group';
+    if (opening) { nameEl.focus(); addQuestion(); }
+  });
+
+  btnCancel.addEventListener('click', closeForm);
+  function closeForm() {
+    form.classList.remove('open');
+    btnToggle.textContent = '＋ New Group';
+    nameEl.value = '';
+    qList.innerHTML = '';
+    errEl.textContent = '';
+    btnCreate.disabled = false;
+  }
+
+  btnAdd.addEventListener('click', () => addQuestion());
+
+  function addQuestion(value = '') {
+    const row = document.createElement('div');
+    row.className = 'question-row';
+    row.innerHTML = `
+      <input class="form-input" type="text" placeholder="e.g. What assumptions are we making?" value="${esc(value)}" autocomplete="off"/>
+      <button class="btn-remove-q" title="Remove">✕</button>`;
+    row.querySelector('.btn-remove-q').addEventListener('click', () => row.remove());
+    qList.appendChild(row);
+    row.querySelector('input').focus();
+  }
+
+  btnCreate.addEventListener('click', async () => {
+    errEl.textContent = '';
+    const name = nameEl.value.trim();
+    if (!name) { errEl.textContent = 'Please enter a group name.'; nameEl.focus(); return; }
+
+    const questions = Array.from(qList.querySelectorAll('input'))
+      .map(i => i.value.trim()).filter(Boolean);
+
+    btnCreate.disabled = true;
+    btnCreate.textContent = 'Creating…';
+
+    try {
+      const base = location.pathname.replace(/\/[^/]*$/, '');
+      const res = await fetch(`${base}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, questions }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const session = await res.json();
+      closeForm();
+      // Immediately render the waiting card from response
+      renderWaitingCard(session, document.getElementById('waiting-list'), true);
+    } catch (e) {
+      errEl.textContent = 'Failed to create session: ' + e.message;
+      btnCreate.disabled = false;
+      btnCreate.textContent = 'Create & generate link';
+    }
+  });
+
+  // ── Render state ───────────────────────────────────────
   const expandedIds = new Set();
 
   function renderState(state) {
     renderTables(state.tables || []);
+    renderWaitingSessions(state.waitingSessions || []);
     renderCandidates(state.candidates || []);
   }
 
+  // ── Waiting sessions ───────────────────────────────────
+  // Track which waiting sessions we've already rendered (to avoid duplicates after optimistic add)
+  const renderedWaiting = new Set();
+
+  function renderWaitingSessions(sessions) {
+    const list = document.getElementById('waiting-list');
+    // Remove waiting cards for sessions that are now active
+    for (const el of list.querySelectorAll('.waiting-card')) {
+      if (!sessions.find(s => s.tableId === el.dataset.id)) el.remove();
+    }
+    for (const s of sessions) {
+      if (!list.querySelector(`[data-id="${s.tableId}"]`)) {
+        renderWaitingCard(s, list, false);
+      }
+    }
+  }
+
+  function renderWaitingCard(session, container, prepend) {
+    // Avoid duplicate if already in DOM
+    if (container.querySelector(`[data-id="${session.tableId}"]`)) return;
+
+    const base = location.pathname.replace(/\/[^/]*$/, '');
+    const podUrl = `${location.origin}${base}/pod.html?table=${session.tableId}`;
+
+    const card = document.createElement('div');
+    card.className = 'waiting-card';
+    card.dataset.id = session.tableId;
+
+    const qHtml = (session.questions || []).length
+      ? `<div class="waiting-questions">
+           <div class="wq-label">Discussion questions</div>
+           ${session.questions.map(q => `<div class="wq-item">${esc(q)}</div>`).join('')}
+         </div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="waiting-card-header">
+        <div class="waiting-name">${esc(session.name)}</div>
+        <div class="waiting-chip">Waiting for pod</div>
+        <div class="waiting-id">${esc(session.tableId)}</div>
+      </div>
+      ${qHtml}
+      <div class="link-row">
+        <span class="link-url">${esc(podUrl)}</span>
+        <button class="btn-copy" data-url="${esc(podUrl)}">Copy link</button>
+      </div>`;
+
+    card.querySelector('.btn-copy').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      navigator.clipboard.writeText(btn.dataset.url).then(() => {
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy link'; btn.classList.remove('copied'); }, 2000);
+      });
+    });
+
+    if (prepend && container.firstChild) container.insertBefore(card, container.firstChild);
+    else container.appendChild(card);
+  }
+
+  // ── Active tables ──────────────────────────────────────
   function renderTables(tables) {
     const grid = document.getElementById('tables-grid');
+
     if (!tables.length) {
-      grid.innerHTML = '<p style="color:var(--muted);font-style:italic;font-size:0.85rem;">No tables connected yet.</p>';
+      // Remove all active cards but leave any static empty msg only if no waiting either
+      for (const el of grid.querySelectorAll('.table-card')) el.remove();
       return;
     }
 
@@ -415,6 +662,10 @@
           card.classList.toggle('expanded', expandedIds.has(t.id));
         });
         grid.appendChild(card);
+
+        // When a pod connects, remove the matching waiting card
+        const waitingCard = document.getElementById('waiting-list').querySelector(`[data-id="${t.id}"]`);
+        if (waitingCard) waitingCard.remove();
       }
       delete existing[t.id];
 
@@ -424,10 +675,10 @@
       const maxWpm = Math.max(...wpmHistory, 1);
       const board = t.board || { clusters: [], ideas: [], quotes: [], flags: [], synthesis: null };
       const isExpanded = expandedIds.has(t.id);
+      const displayName = t.name || t.topic || t.id;
 
       card.className = 'table-card' + (isExpanded ? ' expanded' : '');
 
-      // Build cluster detail HTML
       const clusterHtml = board.clusters.length
         ? board.clusters.map(c => {
             const ideas = (board.ideas || []).filter(i => i.clusterId === c.id);
@@ -439,20 +690,20 @@
         : '<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">No clusters yet</span>';
 
       const quotesHtml = (board.quotes || []).length
-        ? board.quotes.map(q => `<div class="quote-row">"${esc(q.text)}"</div>`).join('')
-        : '';
-
+        ? board.quotes.map(q => `<div class="quote-row">"${esc(q.text)}"</div>`).join('') : '';
       const flagsHtml = (board.flags || []).length
-        ? board.flags.map(f => `<span class="flag-row"><span class="flag-kind">${esc(f.kind.replace(/_/g,' '))}</span>${esc(f.text)}</span>`).join('')
-        : '';
-
+        ? board.flags.map(f => `<span class="flag-row"><span class="flag-kind">${esc(f.kind.replace(/_/g,' '))}</span>${esc(f.text)}</span>`).join('') : '';
       const synthesisHtml = board.synthesis
-        ? `<div class="detail-section"><div class="detail-label">Synthesis</div><div class="synthesis-row">${esc(board.synthesis)}</div></div>`
-        : '';
+        ? `<div class="detail-section"><div class="detail-label">Synthesis</div><div class="synthesis-row">${esc(board.synthesis)}</div></div>` : '';
+
+      const questionsHtml = (t.questions || []).length
+        ? `<div class="detail-section"><div class="detail-label">Discussion questions</div>${
+            t.questions.map(q => `<div class="wq-item" style="padding-left:0.9rem;">${esc(q)}</div>`).join('')
+          }</div>` : '';
 
       card.innerHTML = `
         <div class="table-card-summary">
-          <div class="table-id">Table ${esc(t.id)}</div>
+          <div class="table-id">${esc(displayName)}</div>
           <div class="status-chip ${status}">${status}</div>
           <div class="sparkline-wrap">${
             Array.from({length: 10}, (_, i) => {
@@ -466,6 +717,7 @@
         </div>
         <div class="table-detail">
           ${synthesisHtml}
+          ${questionsHtml}
           <div class="detail-section">
             <div class="detail-label">Clusters &amp; Ideas</div>
             ${clusterHtml}
@@ -475,11 +727,10 @@
         </div>`;
     }
 
-    // Remove stale cards
     for (const el of Object.values(existing)) el.remove();
   }
 
-  // ── Candidates ──────────────────────────────────────────
+  // ── Candidates ─────────────────────────────────────────
   function renderCandidates(candidates) {
     const list = document.getElementById('candidates-list');
     const active = candidates.filter(c => c.state !== 'dismissed');
@@ -494,17 +745,12 @@
 
     for (const c of active) {
       let card = existing[c.id];
-      if (!card) {
-        card = document.createElement('div');
-        card.dataset.id = c.id;
-        list.appendChild(card);
-      }
+      if (!card) { card = document.createElement('div'); card.dataset.id = c.id; list.appendChild(card); }
       delete existing[c.id];
 
       card.className = `candidate-card ${c.confidence === 'high' ? 'high' : ''} ${c.state}`;
-
       const evidenceChips = (c.evidence || []).map(e =>
-        `<div class="evidence-chip"><span class="ev-table">${esc(e.table)}</span>${esc(e.quote.slice(0, 60))}…</div>`
+        `<div class="evidence-chip"><span class="ev-table">${esc(e.table)}</span>${esc(e.quote.slice(0,60))}…</div>`
       ).join('');
 
       card.innerHTML = `
@@ -525,20 +771,13 @@
 
     for (const el of Object.values(existing)) el.remove();
 
-    // Wire buttons (event delegation)
     list.onclick = (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
-      const id = btn.dataset.id;
-      const action = btn.dataset.action;
-      if (action === 'reveal') {
-        send({ type: 'reveal', candidateId: id });
-      } else if (action === 'edit') {
-        const text = prompt('Edit topic text:', id);
-        if (text !== null) send({ type: 'reveal_custom', candidateId: id, text });
-      } else if (action === 'dismiss') {
-        send({ type: 'dismiss', candidateId: id });
-      }
+      const id = btn.dataset.id, action = btn.dataset.action;
+      if (action === 'reveal') send({ type: 'reveal', candidateId: id });
+      else if (action === 'edit') { const t = prompt('Edit topic text:', id); if (t !== null) send({ type: 'reveal_custom', candidateId: id, text: t }); }
+      else if (action === 'dismiss') send({ type: 'dismiss', candidateId: id });
     };
   }
 

@@ -82,8 +82,24 @@ export interface ThemeCandidate {
 
 // ── In-memory store ──────────────────────────────────────────────────────────
 
+export interface SessionConfig {
+  tableId: string;
+  name: string;
+  questions: string[];
+  createdAt: number;
+}
+
 export const tables = new Map<string, TableState>();
 export const themeCandidates = new Map<string, ThemeCandidate>();
+export const sessionConfigs = new Map<string, SessionConfig>();
+
+export function createSession(name: string, questions: string[]): SessionConfig {
+  // Short readable token: 6 uppercase alphanumeric chars
+  const token = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const config: SessionConfig = { tableId: token, name, questions, createdAt: Date.now() };
+  sessionConfigs.set(token, config);
+  return config;
+}
 
 // WebSocket client registry
 export const podSockets = new Map<string, WebSocket>(); // tableId → ws
@@ -142,16 +158,32 @@ export function sendToPod(tableId: string, msg: unknown): void {
 }
 
 export function consoleSnapshot() {
-  const tableArr = Array.from(tables.values()).map((t) => ({
-    id: t.id,
-    topic: t.topic,
-    summary: t.summary,
-    metrics: t.metrics,
-    board: t.board,
-  }));
+  const tableArr = Array.from(tables.values()).map((t) => {
+    const cfg = sessionConfigs.get(t.id);
+    return {
+      id: t.id,
+      topic: t.topic,
+      name: cfg?.name ?? t.topic ?? t.id,
+      questions: cfg?.questions ?? [],
+      summary: t.summary,
+      metrics: t.metrics,
+      board: t.board,
+    };
+  });
+
+  // Sessions created but pod not yet connected
+  const waitingArr = Array.from(sessionConfigs.values())
+    .filter((s) => !tables.has(s.tableId))
+    .map((s) => ({
+      tableId: s.tableId,
+      name: s.name,
+      questions: s.questions,
+      createdAt: s.createdAt,
+    }));
+
   const candidateArr = Array.from(themeCandidates.values()).sort((a, b) => {
     const order = { ready: 0, pending: 1, revealed: 2, dismissed: 3 };
     return (order[a.state] ?? 9) - (order[b.state] ?? 9);
   });
-  return { type: "state", tables: tableArr, candidates: candidateArr };
+  return { type: "state", tables: tableArr, waitingSessions: waitingArr, candidates: candidateArr };
 }

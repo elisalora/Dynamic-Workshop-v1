@@ -53,24 +53,18 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2.5rem;
+    gap: 2rem;
     text-align: center;
-    padding: 3rem;
+    padding: 3rem 4rem;
   }
   #start-screen h1 {
     font-family: 'Playfair Display', serif;
-    font-size: clamp(3rem, 7vw, 6rem);
+    font-size: clamp(2.5rem, 6vw, 5.5rem);
     letter-spacing: -0.02em;
   }
   .start-quill {
     opacity: 0.35;
     color: var(--accent);
-  }
-  #start-screen p {
-    font-size: clamp(1.1rem, 2.2vw, 1.8rem);
-    color: var(--ink-muted);
-    max-width: 28ch;
-    line-height: 1.5;
   }
   .table-label {
     font-size: clamp(0.9rem, 1.6vw, 1.4rem);
@@ -78,6 +72,47 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
   }
+
+  /* Discussion questions on start screen */
+  #start-questions {
+    display: none;
+    max-width: 700px;
+    width: 100%;
+    text-align: left;
+    background: rgba(139,69,19,0.06);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+  }
+  #start-questions.visible { display: block; }
+  .sq-heading {
+    font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--accent-light);
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+  .sq-item {
+    font-family: 'Source Serif 4', serif;
+    font-size: clamp(1rem, 1.8vw, 1.5rem);
+    color: var(--ink);
+    line-height: 1.4;
+    padding-left: 1.4em;
+    position: relative;
+    margin-bottom: 0.55rem;
+  }
+  .sq-item::before {
+    content: '?';
+    position: absolute; left: 0;
+    color: var(--accent);
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85em;
+    top: 0.1em;
+  }
+  .sq-item:last-child { margin-bottom: 0; }
+
   #start-btn {
     background: var(--accent);
     color: var(--paper);
@@ -421,9 +456,15 @@
     <path d="M38 20 C34 24, 28 30, 24 38"/>
     <path d="M44 14 C40 20, 34 28, 30 36"/>
   </svg>
-  <h1>Scribe Pilot</h1>
+  <h1 id="start-title">Scribe Pilot</h1>
   <div class="table-label" id="table-display">Table —</div>
-  <p>Click to allow microphone access and begin the live scribe board.</p>
+
+  <!-- Discussion questions — shown when session has questions -->
+  <div id="start-questions">
+    <div class="sq-heading">Discussion questions</div>
+    <div id="sq-list"></div>
+  </div>
+
   <button id="start-btn">Start Recording</button>
   <div id="demo-note">Demo mode — no mic needed</div>
 </div>
@@ -614,6 +655,22 @@
   if (demo) document.getElementById('demo-note').style.display = 'block';
 
   let ws = null, stream = null;
+  let sessionName = topic || ('Table ' + tableId);
+
+  function showQuestions(questions, name) {
+    if (name) {
+      sessionName = name;
+      document.getElementById('start-title').textContent = name;
+      document.getElementById('table-display').textContent = 'Table ' + tableId;
+    }
+    if (!questions || !questions.length) return;
+    const box = document.getElementById('start-questions');
+    const list = document.getElementById('sq-list');
+    list.innerHTML = questions.map(q =>
+      `<div class="sq-item">${esc(q)}</div>`
+    ).join('');
+    box.classList.add('visible');
+  }
 
   const DEMO_LINES = [
     'I think we need to focus on the user experience first before we scale.',
@@ -644,8 +701,11 @@
     ws.addEventListener('message', (evt) => {
       try {
         const msg = JSON.parse(evt.data);
-        if (msg.type === 'canvas_state') renderBoard(msg.board);
-        else if (msg.type === 'tick') showTick(msg.text);
+        if (msg.type === 'canvas_state') {
+          // Show questions + session name on start screen before recording starts
+          showQuestions(msg.questions, msg.sessionName);
+          renderBoard(msg.board);
+        } else if (msg.type === 'tick') showTick(msg.text);
       } catch {}
     });
     ws.addEventListener('close', () => {
@@ -673,10 +733,7 @@
   document.getElementById('start-btn').addEventListener('click', async () => {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('board').classList.add('active');
-    document.getElementById('board-title').textContent =
-      topic ? `${topic} — Table ${tableId}` : `Table ${tableId}`;
-
-    connectWs();
+    document.getElementById('board-title').textContent = sessionName;
 
     if (demo) {
       setInterval(() => {
