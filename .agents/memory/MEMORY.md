@@ -1,0 +1,1 @@
+- [Clerk CDN in screenshot sandbox](clerk-cdn-screenshot.md) — CDN always fails in screenshot tool; auth fallback is intentional, not a bug.

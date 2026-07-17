@@ -29,10 +29,75 @@
     font-size: 14px;
     min-height: 100vh;
     padding: 1rem;
-    max-width: 860px;
+    max-width: 900px;
     margin: 0 auto;
   }
 
+  /* ── Auth overlay ───────────────────────────── */
+  #auth-overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  #auth-overlay.hidden { display: none; }
+  .auth-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  }
+  .auth-logo {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+  .auth-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .auth-subtitle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+    line-height: 1.5;
+  }
+  .btn-signin {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    transition: opacity 0.15s;
+    font-family: inherit;
+  }
+  .btn-signin:hover { opacity: 0.88; }
+  .btn-signin:disabled { opacity: 0.5; cursor: default; }
+  .auth-loading {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 1rem;
+    font-style: italic;
+  }
+
+  /* ── Header ─────────────────────────────────── */
   header {
     display: flex;
     align-items: center;
@@ -40,6 +105,8 @@
     padding: 0.75rem 0 1rem;
     border-bottom: 1px solid var(--border);
     margin-bottom: 1.25rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
   header h1 {
     font-size: 1.1rem;
@@ -48,6 +115,27 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
+  .header-right { display: flex; align-items: center; gap: 0.75rem; }
+  #user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  #user-name { font-weight: 600; color: var(--text); max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .btn-signout {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.12s, color 0.12s;
+  }
+  .btn-signout:hover { background: #fee2e2; color: var(--red); border-color: #fca5a5; }
   #conn-status {
     font-size: 0.75rem;
     color: var(--muted);
@@ -74,9 +162,9 @@
     letter-spacing: 0.15em;
     color: var(--muted);
   }
-  .header-btns { display: flex; gap: 0.5rem; }
+  .header-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-  .btn-new-group, .btn-new-workshop {
+  .btn-new-group, .btn-new-workshop, .btn-new-session {
     border: none;
     border-radius: 5px;
     padding: 0.3rem 0.8rem;
@@ -87,15 +175,18 @@
     align-items: center;
     gap: 0.35rem;
     transition: opacity 0.15s;
+    font-family: inherit;
   }
   .btn-new-group { background: var(--accent); color: #fff; }
   .btn-new-group:hover { opacity: 0.85; }
   .btn-new-workshop { background: var(--surface); color: var(--accent); border: 1.5px solid var(--accent); }
   .btn-new-workshop:hover { background: #eff6ff; }
+  .btn-new-session { background: var(--surface); color: var(--purple); border: 1.5px solid #c4b5fd; }
+  .btn-new-session:hover { background: #f5f3ff; }
 
   /* ── Forms ──────────────────────────────────── */
   #groups-section { margin-bottom: 1.75rem; }
-  #new-group-form, #new-workshop-form {
+  .collapsible-form {
     display: none;
     background: var(--surface);
     border: 1.5px solid var(--accent);
@@ -104,7 +195,8 @@
     margin-bottom: 0.75rem;
     animation: slideDown 0.2s ease-out;
   }
-  #new-group-form.open, #new-workshop-form.open { display: block; }
+  .collapsible-form.session-form { border-color: #c4b5fd; }
+  .collapsible-form.open { display: block; }
   @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
 
   .form-row { margin-bottom: 0.85rem; }
@@ -117,7 +209,7 @@
     color: var(--muted);
     margin-bottom: 0.35rem;
   }
-  .form-input {
+  .form-input, .form-select {
     width: 100%;
     border: 1px solid var(--border);
     border-radius: 5px;
@@ -128,7 +220,7 @@
     color: var(--text);
     transition: border-color 0.15s;
   }
-  .form-input:focus { outline: none; border-color: var(--accent); }
+  .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
 
   #questions-list { display: flex; flex-direction: column; gap: 0.45rem; }
   .question-row { display: flex; gap: 0.4rem; align-items: center; }
@@ -158,6 +250,7 @@
     text-align: left;
     margin-top: 0.35rem;
     transition: border-color 0.15s, color 0.15s;
+    font-family: inherit;
   }
   .btn-add-q:hover { border-color: var(--accent); color: var(--accent); }
   .form-actions { display: flex; gap: 0.5rem; margin-top: 0.85rem; align-items: center; }
@@ -171,6 +264,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: opacity 0.15s;
+    font-family: inherit;
   }
   .btn-create:hover { opacity: 0.85; }
   .btn-create:disabled { opacity: 0.5; cursor: default; }
@@ -182,35 +276,37 @@
     font-size: 0.85rem;
     color: var(--muted);
     cursor: pointer;
+    font-family: inherit;
   }
   .form-error { color: var(--red); font-size: 0.8rem; flex: 1; }
 
-  /* ── Workshop folders ───────────────────────── */
-  #workshops-list { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.5rem; }
+  /* ── Workshop folders (top level) ───────────── */
+  #workshops-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 0.5rem; }
 
   .workshop-folder {
     background: var(--surface);
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
     transition: border-color 0.15s;
   }
-  .workshop-folder:has(.workshop-body.open) { border-color: #bfdbfe; }
+  .workshop-folder:has(.workshop-body.open) { border-color: #93c5fd; }
 
   .workshop-header {
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    padding: 0.75rem 0.85rem;
+    padding: 0.85rem 1rem;
     cursor: pointer;
     user-select: none;
-    background: #f8faff;
+    background: #f0f7ff;
     transition: background 0.1s;
   }
-  .workshop-header:hover { background: #eff6ff; }
+  .workshop-header:hover { background: #e0f0ff; }
   .workshop-chevron { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; transition: transform 0.18s; }
   .workshop-chevron.open { transform: rotate(90deg); }
-  .workshop-name { font-weight: 700; font-size: 0.95rem; flex: 1; }
+  .workshop-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .workshop-name { font-weight: 700; font-size: 1rem; flex: 1; color: var(--text); }
   .workshop-count {
     font-size: 0.68rem;
     color: var(--muted);
@@ -222,6 +318,102 @@
   }
   .workshop-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
 
+  .workshop-body { display: none; }
+  .workshop-body.open { display: block; }
+  .workshop-body-inner { padding: 0.75rem 0.85rem; display: flex; flex-direction: column; gap: 0.6rem; }
+  .workshop-add-session-btn {
+    width: 100%;
+    background: none;
+    border: 1px dashed #c4b5fd;
+    border-radius: 7px;
+    padding: 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--purple);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.12s;
+    text-align: center;
+  }
+  .workshop-add-session-btn:hover { background: #f5f3ff; }
+
+  /* ── Session folders (middle level) ─────────── */
+  .session-folder {
+    background: var(--surface);
+    border: 1.5px solid #e9d5ff;
+    border-radius: 9px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .session-folder:has(.session-body.open) { border-color: #a78bfa; }
+
+  .session-header {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    background: #faf5ff;
+    transition: background 0.1s;
+  }
+  .session-header:hover { background: #f3e8ff; }
+  .session-chevron { font-size: 0.7rem; color: #a78bfa; flex-shrink: 0; transition: transform 0.18s; }
+  .session-chevron.open { transform: rotate(90deg); }
+  .session-name { font-weight: 600; font-size: 0.92rem; flex: 1; color: var(--text); }
+  .session-count {
+    font-size: 0.65rem;
+    color: var(--purple);
+    background: #ede9fe;
+    border: 1px solid #c4b5fd;
+    border-radius: 100px;
+    padding: 0.1rem 0.5rem;
+    flex-shrink: 0;
+  }
+  .session-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
+
+  .session-body { display: none; border-top: 1px solid #e9d5ff; }
+  .session-body.open { display: block; }
+  .session-tables { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.65rem 0.85rem; }
+  .session-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-style: italic;
+    padding: 0.75rem;
+  }
+  .session-summary-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0.85rem 0.6rem;
+    padding: 0.45rem 0.65rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: var(--green);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .session-summary-bar:hover { background: #dcfce7; }
+  .session-summary-bar span { flex: 1; font-weight: 600; }
+  .session-summary-bar .sum-date { font-weight: 400; font-size: 0.68rem; opacity: 0.75; }
+
+  /* ── Subsection label ───────────────────────── */
+  .subsection-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    padding: 0.4rem 0.1rem 0.3rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.4rem;
+    border-top: 1px dashed var(--border);
+  }
+  .subsection-label:first-child { border-top: none; margin-top: 0; }
+
+  /* ── Shared small buttons ───────────────────── */
   .btn-sm {
     font-family: inherit;
     font-size: 0.72rem;
@@ -242,46 +434,6 @@
   .btn-sm-summary { background: #eff6ff; color: var(--accent); border-color: #bfdbfe; }
   .btn-sm-summary:hover { background: #dbeafe; }
   .btn-sm-summary:disabled { opacity: 0.5; cursor: default; }
-
-  .workshop-body { display: none; border-top: 1px solid var(--border); }
-  .workshop-body.open { display: block; }
-  .workshop-tables { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 0.85rem; }
-  .workshop-empty {
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.8rem;
-    font-style: italic;
-    padding: 1rem;
-  }
-  .workshop-summary-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0 0.85rem 0.75rem;
-    padding: 0.5rem 0.7rem;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-radius: 6px;
-    font-size: 0.78rem;
-    color: var(--green);
-    cursor: pointer;
-    transition: background 0.12s;
-  }
-  .workshop-summary-bar:hover { background: #dcfce7; }
-  .workshop-summary-bar span { flex: 1; font-weight: 600; }
-  .workshop-summary-bar .sum-date { font-weight: 400; font-size: 0.7rem; opacity: 0.75; }
-
-  /* ── Subsection label (Unassigned) ──────────── */
-  .subsection-label {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--muted);
-    padding: 0.4rem 0.1rem 0.3rem;
-    margin-top: 0.5rem;
-    margin-bottom: 0.4rem;
-    border-top: 1px dashed var(--border);
-  }
 
   /* ── Waiting session card ───────────────────── */
   .waiting-card {
@@ -375,13 +527,12 @@
     color: var(--text);
     cursor: pointer;
     transition: background 0.15s;
+    font-family: inherit;
   }
   .btn-copy:hover { background: #dbeafe; border-color: var(--accent); color: var(--accent); }
   .btn-copy.copied { background: #dcfce7; border-color: var(--green); color: var(--green); }
 
   /* ── Active table cards ─────────────────────── */
-  #tables-grid, .workshop-tables { display: flex; flex-direction: column; gap: 0.5rem; }
-
   .table-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -404,7 +555,7 @@
     font-size: 0.95rem;
     color: var(--text);
     flex-shrink: 0;
-    max-width: 200px;
+    max-width: 180px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -521,7 +672,7 @@
     text-overflow: ellipsis;
   }
 
-  /* Assign-to-workshop select */
+  /* Assign-to-session select */
   .assign-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.85rem; }
   .assign-select {
     flex: 1;
@@ -534,7 +685,7 @@
     color: var(--text);
     cursor: pointer;
   }
-  .assign-select:focus { outline: none; border-color: var(--accent); }
+  .assign-select:focus { outline: none; border-color: var(--purple); }
 
   /* Archive button */
   .btn-archive {
@@ -549,6 +700,7 @@
     cursor: pointer;
     text-align: center;
     transition: background 0.12s, color 0.12s, border-color 0.12s;
+    font-family: inherit;
   }
   .btn-archive:hover { background: #fff7ed; color: var(--orange); border-color: #fdba74; }
 
@@ -603,6 +755,7 @@
     font-weight: 600;
     color: var(--muted);
     cursor: pointer;
+    font-family: inherit;
     transition: background 0.12s, color 0.12s;
   }
   .btn-restore:hover { background: #dcfce7; border-color: var(--green); color: var(--green); }
@@ -640,7 +793,7 @@
   .evidence-chip .ev-table { color: var(--accent); font-weight: 700; margin-right: 0.3em; }
   .cand-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-  .btn { border: none; border-radius: 5px; padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+  .btn { border: none; border-radius: 5px; padding: 0.4rem 0.85rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; font-family: inherit; }
   .btn:hover { opacity: 0.85; }
   .btn:active { transform: scale(0.97); }
   .btn-reveal  { background: var(--accent); color: #fff; }
@@ -741,11 +894,36 @@
 </head>
 <body>
 
+<!-- ── Auth overlay ────────────────────────────── -->
+<div id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo">🎙</div>
+    <div class="auth-title">Scribe Pilot</div>
+    <div class="auth-subtitle">Facilitator Console — sign in to manage your workshops and sessions.</div>
+    <button class="btn-signin" id="btn-signin" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#fff" opacity=".9"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#fff" opacity=".9"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#fff" opacity=".9"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#fff" opacity=".9"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <div class="auth-loading" id="auth-loading">Loading…</div>
+  </div>
+</div>
+
 <header>
   <h1>Facilitator Console</h1>
-  <div id="conn-status">
-    <div class="conn-dot" id="conn-dot"></div>
-    <span id="conn-text">Connecting…</span>
+  <div class="header-right">
+    <div id="user-info" style="display:none">
+      <span id="user-name"></span>
+      <button class="btn-signout" id="btn-signout">Sign out</button>
+    </div>
+    <div id="conn-status">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="conn-text">Connecting…</span>
+    </div>
   </div>
 </header>
 
@@ -755,15 +933,16 @@
     <div class="section-title">Discussion Groups</div>
     <div class="header-btns">
       <button class="btn-new-workshop" id="btn-new-workshop">⊞ New Workshop</button>
+      <button class="btn-new-session" id="btn-new-session">⊟ New Session</button>
       <button class="btn-new-group" id="btn-new-group">＋ New Group</button>
     </div>
   </div>
 
   <!-- New Workshop form -->
-  <div id="new-workshop-form">
+  <div id="new-workshop-form" class="collapsible-form">
     <div class="form-row">
       <label class="form-label" for="workshop-name">Workshop name</label>
-      <input class="form-input" id="workshop-name" type="text" placeholder="e.g. Innovation Sprint — Day 1" autocomplete="off"/>
+      <input class="form-input" id="workshop-name" type="text" placeholder="e.g. Robotics Workshop 2026" autocomplete="off"/>
     </div>
     <div class="form-actions">
       <button class="btn-create" id="btn-create-workshop">Create workshop</button>
@@ -772,8 +951,27 @@
     </div>
   </div>
 
+  <!-- New Session form -->
+  <div id="new-session-form" class="collapsible-form session-form">
+    <div class="form-row">
+      <label class="form-label" for="session-name">Session name</label>
+      <input class="form-input" id="session-name" type="text" placeholder="e.g. Day 1 Morning, Session 3…" autocomplete="off"/>
+    </div>
+    <div class="form-row">
+      <label class="form-label" for="session-workshop-select">Workshop <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+      <select class="form-select" id="session-workshop-select">
+        <option value="">— No workshop —</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn-create" id="btn-create-session">Create session</button>
+      <button class="btn-cancel" id="btn-cancel-session">Cancel</button>
+      <span class="form-error" id="form-error-session"></span>
+    </div>
+  </div>
+
   <!-- New Group form -->
-  <div id="new-group-form">
+  <div id="new-group-form" class="collapsible-form">
     <div class="form-row">
       <label class="form-label" for="group-name">Group name</label>
       <input class="form-input" id="group-name" type="text" placeholder="e.g. Future of Work, Table 3…" autocomplete="off"/>
@@ -783,6 +981,12 @@
       <div id="questions-list"></div>
       <button class="btn-add-q" id="btn-add-q">＋ Add a question</button>
     </div>
+    <div class="form-row">
+      <label class="form-label" for="group-session-select">Session <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+      <select class="form-select" id="group-session-select">
+        <option value="">— No session —</option>
+      </select>
+    </div>
     <div class="form-actions">
       <button class="btn-create" id="btn-create">Create &amp; generate link</button>
       <button class="btn-cancel" id="btn-cancel">Cancel</button>
@@ -790,15 +994,18 @@
     </div>
   </div>
 
-  <!-- Workshop folders -->
+  <!-- Workshop folders (each contains session folders) -->
   <div id="workshops-list"></div>
 
-  <!-- Waiting sessions (no workshop) -->
+  <!-- Unassigned sessions (not in any workshop) -->
+  <div id="unassigned-sessions-section"></div>
+
+  <!-- Waiting groups (group configs where pod hasn't connected yet) -->
   <div id="waiting-list"></div>
 
-  <!-- Unassigned active tables -->
-  <div id="unassigned-section">
-    <div class="subsection-label" id="unassigned-label" style="display:none">Unassigned</div>
+  <!-- Unassigned groups (not in any session) -->
+  <div id="unassigned-groups-section">
+    <div class="subsection-label" id="unassigned-groups-label" style="display:none">Unassigned Groups</div>
     <div id="tables-grid"></div>
   </div>
 
@@ -846,7 +1053,85 @@
   const base = location.pathname.replace(/\/[^/]*$/, '');
   let ws = null;
   let currentWorkshops = [];
+  let currentSessions  = [];
+  let currentTables    = [];
   let archivedOpen = false;
+  let _clerkInstance = null;
+
+  // ── Auth ───────────────────────────────────────────────
+  async function initAuth() {
+    try {
+      const cfg = await fetch(`${base}/auth/config`).then(r => r.json());
+      const publishableKey = cfg.publishableKey;
+
+      if (!publishableKey) {
+        // Auth not configured — show console without login
+        showConsole(null);
+        return;
+      }
+
+      // Load Clerk JS from CDN (pinned to v4 — stable window.Clerk constructor shape)
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@4/dist/clerk.browser.js';
+        s.crossOrigin = 'anonymous';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+
+      // Handle both v4 (window.Clerk = class) and v5 (window.Clerk = {Clerk: class})
+      const ClerkCtor = typeof window.Clerk === 'function'
+        ? window.Clerk
+        : window.Clerk?.Clerk;
+      if (!ClerkCtor) throw new Error('Clerk CDN did not expose a constructor');
+
+      const clerk = new ClerkCtor(publishableKey);
+      await clerk.load();
+      _clerkInstance = clerk;
+
+      if (!clerk.user) {
+        // Show sign-in button
+        document.getElementById('auth-loading').style.display = 'none';
+        const btn = document.getElementById('btn-signin');
+        btn.disabled = false;
+        btn.addEventListener('click', () => {
+          btn.disabled = true;
+          btn.textContent = 'Redirecting…';
+          clerk.redirectToSignIn({ redirectUrl: window.location.href });
+        });
+
+        // Listen for sign-in completion (e.g. returning from redirect)
+        clerk.addListener(({ user }) => {
+          if (user) showConsole(clerk);
+        });
+        return;
+      }
+
+      showConsole(clerk);
+    } catch (err) {
+      console.error('Auth init failed:', err);
+      // Fail open — show console anyway so facilitators aren't locked out
+      document.getElementById('auth-loading').textContent = 'Auth unavailable — continuing…';
+      setTimeout(() => showConsole(null), 1500);
+    }
+  }
+
+  function showConsole(clerk) {
+    document.getElementById('auth-overlay').classList.add('hidden');
+
+    if (clerk && clerk.user) {
+      const u = clerk.user;
+      const display = u.fullName || u.primaryEmailAddress?.emailAddress || 'Facilitator';
+      document.getElementById('user-name').textContent = display;
+      document.getElementById('user-info').style.display = 'flex';
+      document.getElementById('btn-signout').addEventListener('click', () => {
+        clerk.signOut().then(() => location.reload());
+      });
+    }
+
+    connect();
+  }
 
   // ── WebSocket ──────────────────────────────────────────
   function connect() {
@@ -882,20 +1167,17 @@
   }
 
   // ── New Workshop form ──────────────────────────────────
-  const wfForm    = document.getElementById('new-workshop-form');
-  const wfNameEl  = document.getElementById('workshop-name');
-  const wfErrEl   = document.getElementById('form-error-workshop');
-  const btnNewWs  = document.getElementById('btn-new-workshop');
+  const wfForm   = document.getElementById('new-workshop-form');
+  const wfNameEl = document.getElementById('workshop-name');
+  const wfErrEl  = document.getElementById('form-error-workshop');
+  const btnNewWs = document.getElementById('btn-new-workshop');
 
   btnNewWs.addEventListener('click', () => {
     const opening = !wfForm.classList.contains('open');
+    closeAllForms();
     wfForm.classList.toggle('open', opening);
     btnNewWs.textContent = opening ? '✕ Close' : '⊞ New Workshop';
-    if (opening) {
-      // close group form if open
-      closeGroupForm();
-      wfNameEl.focus();
-    }
+    if (opening) wfNameEl.focus();
   });
   document.getElementById('btn-cancel-workshop').addEventListener('click', closeWorkshopForm);
   function closeWorkshopForm() {
@@ -904,7 +1186,6 @@
     wfNameEl.value = '';
     wfErrEl.textContent = '';
   }
-
   document.getElementById('btn-create-workshop').addEventListener('click', async () => {
     wfErrEl.textContent = '';
     const name = wfNameEl.value.trim();
@@ -912,6 +1193,37 @@
     const res = await apiFetch('/workshops', 'POST', { name });
     if (!res.ok) { wfErrEl.textContent = 'Failed: ' + await res.text(); return; }
     closeWorkshopForm();
+  });
+
+  // ── New Session form ───────────────────────────────────
+  const sfForm    = document.getElementById('new-session-form');
+  const sfNameEl  = document.getElementById('session-name');
+  const sfErrEl   = document.getElementById('form-error-session');
+  const sfWsEl    = document.getElementById('session-workshop-select');
+  const btnNewSes = document.getElementById('btn-new-session');
+
+  btnNewSes.addEventListener('click', () => {
+    const opening = !sfForm.classList.contains('open');
+    closeAllForms();
+    sfForm.classList.toggle('open', opening);
+    btnNewSes.textContent = opening ? '✕ Close' : '⊟ New Session';
+    if (opening) { populateWorkshopSelect(sfWsEl); sfNameEl.focus(); }
+  });
+  document.getElementById('btn-cancel-session').addEventListener('click', closeSessionForm);
+  function closeSessionForm() {
+    sfForm.classList.remove('open');
+    btnNewSes.textContent = '⊟ New Session';
+    sfNameEl.value = '';
+    sfErrEl.textContent = '';
+  }
+  document.getElementById('btn-create-session').addEventListener('click', async () => {
+    sfErrEl.textContent = '';
+    const name = sfNameEl.value.trim();
+    if (!name) { sfErrEl.textContent = 'Please enter a name.'; sfNameEl.focus(); return; }
+    const workshopId = sfWsEl.value || undefined;
+    const res = await apiFetch('/sessions', 'POST', { name, workshopId });
+    if (!res.ok) { sfErrEl.textContent = 'Failed: ' + await res.text(); return; }
+    closeSessionForm();
   });
 
   // ── New Group form ─────────────────────────────────────
@@ -923,14 +1235,15 @@
   const btnCancel = document.getElementById('btn-cancel');
   const errEl     = document.getElementById('form-error');
   const nameEl    = document.getElementById('group-name');
+  const grpSesEl  = document.getElementById('group-session-select');
 
   btnToggle.addEventListener('click', () => {
     const opening = !form.classList.contains('open');
+    closeAllForms();
     form.classList.toggle('open', opening);
     btnToggle.textContent = opening ? '✕ Close' : '＋ New Group';
-    if (opening) { closeWorkshopForm(); nameEl.focus(); addQuestion(); }
+    if (opening) { populateSessionSelect(grpSesEl); nameEl.focus(); addQuestion(); }
   });
-
   btnCancel.addEventListener('click', closeGroupForm);
   function closeGroupForm() {
     form.classList.remove('open');
@@ -940,6 +1253,12 @@
     errEl.textContent = '';
     btnCreate.disabled = false;
     btnCreate.textContent = 'Create & generate link';
+  }
+
+  function closeAllForms() {
+    closeWorkshopForm();
+    closeSessionForm();
+    closeGroupForm();
   }
 
   btnAdd.addEventListener('click', () => addQuestion());
@@ -959,18 +1278,23 @@
     const name = nameEl.value.trim();
     if (!name) { errEl.textContent = 'Please enter a group name.'; nameEl.focus(); return; }
     const questions = Array.from(qList.querySelectorAll('input')).map(i => i.value.trim()).filter(Boolean);
+    const sessionId = grpSesEl.value || null;
     btnCreate.disabled = true;
     btnCreate.textContent = 'Creating…';
     try {
-      const res = await fetch(`${base}/sessions`, {
+      const res = await fetch(`${base}/groups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, questions }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const session = await res.json();
+      const group = await res.json();
+      // If a session was selected, assign the group to it
+      if (sessionId) {
+        await apiFetch(`/sessions/${sessionId}/assign/${group.tableId}`);
+      }
       closeGroupForm();
-      renderWaitingCard(session, document.getElementById('waiting-list'), true);
+      renderWaitingCard(group, document.getElementById('waiting-list'), true);
     } catch (e) {
       errEl.textContent = 'Failed: ' + e.message;
       btnCreate.disabled = false;
@@ -978,76 +1302,99 @@
     }
   });
 
+  // ── Populate dropdown helpers ──────────────────────────
+  function populateWorkshopSelect(sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— No workshop —</option>';
+    for (const w of currentWorkshops) {
+      const o = document.createElement('option');
+      o.value = w.id; o.textContent = w.name;
+      sel.appendChild(o);
+    }
+    if (cur) sel.value = cur;
+  }
+
+  function populateSessionSelect(sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— No session —</option>';
+    for (const s of currentSessions) {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.name;
+      sel.appendChild(o);
+    }
+    if (cur) sel.value = cur;
+  }
+
   // ── Render state ───────────────────────────────────────
-  const expandedIds = new Set();
   const expandedWorkshops = new Set();
+  const expandedSessions  = new Set();
+  const expandedIds       = new Set();
 
   function renderState(state) {
     currentWorkshops = state.workshops || [];
-    renderWorkshops(state.workshops || [], state.tables || []);
+    currentSessions  = state.sessions  || [];
+    currentTables    = state.tables    || [];
+
+    renderWorkshops();
+    renderUnassignedSessions();
     renderWaitingSessions(state.waitingSessions || []);
-    renderUnassigned(state.tables || [], state.workshops || []);
+    renderUnassignedGroups();
     renderCandidates(state.candidates || []);
     renderArchived(state.archivedTables || []);
   }
 
   // ── Workshop folders ───────────────────────────────────
-  function renderWorkshops(workshops, allTables) {
+  function renderWorkshops() {
     const list = document.getElementById('workshops-list');
+    const existing = {};
+    for (const el of list.querySelectorAll('.workshop-folder')) existing[el.dataset.id] = el;
 
-    // Track which workshop folders exist
-    const existingFolders = {};
-    for (const el of list.querySelectorAll('.workshop-folder')) {
-      existingFolders[el.dataset.workshopId] = el;
-    }
-
-    for (const w of workshops) {
-      const wTables = allTables.filter(t => w.tableIds.includes(t.id));
-      let folder = existingFolders[w.id];
-      const isNew = !folder;
-      if (isNew) {
+    for (const w of currentWorkshops) {
+      let folder = existing[w.id];
+      if (!folder) {
         folder = document.createElement('div');
         folder.className = 'workshop-folder';
-        folder.dataset.workshopId = w.id;
+        folder.dataset.id = w.id;
         list.appendChild(folder);
-        if (!expandedWorkshops.has(w.id)) expandedWorkshops.add(w.id); // open by default
+        if (!expandedWorkshops.has(w.id)) expandedWorkshops.add(w.id);
       }
-      delete existingFolders[w.id];
+      delete existing[w.id];
 
       const isOpen = expandedWorkshops.has(w.id);
-      const hasSummary = !!w.summary;
+      const wSessions = currentSessions.filter(s => s.workshopId === w.id);
+      const totalGroups = wSessions.reduce((n, s) => n + s.tableIds.length, 0);
 
       folder.innerHTML = `
         <div class="workshop-header" data-action="toggle-ws" data-wsid="${esc(w.id)}">
           <span class="workshop-chevron ${isOpen ? 'open' : ''}">▶</span>
+          <span class="workshop-icon">📁</span>
           <span class="workshop-name">${esc(w.name)}</span>
-          <span class="workshop-count">${wTables.length} discussion${wTables.length !== 1 ? 's' : ''}</span>
+          <span class="workshop-count">${wSessions.length} session${wSessions.length !== 1 ? 's' : ''} · ${totalGroups} group${totalGroups !== 1 ? 's' : ''}</span>
           <div class="workshop-actions" onclick="event.stopPropagation()">
-            ${hasSummary ? `<button class="btn-sm btn-sm-summary" data-action="view-summary" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">✦ View Summary</button>` : ''}
-            <button class="btn-sm btn-sm-primary" data-action="gen-summary" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">${hasSummary ? '↺ Regenerate' : '✦ Create Summary'}</button>
+            <button class="btn-sm" data-action="add-session-to-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}" title="Add session">＋ Session</button>
             <button class="btn-sm" data-action="rename-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Rename</button>
             <button class="btn-sm btn-sm-danger" data-action="delete-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Delete</button>
           </div>
         </div>
         <div class="workshop-body ${isOpen ? 'open' : ''}">
-          ${hasSummary ? `
-            <div class="workshop-summary-bar" data-action="view-summary" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">
-              <span>✦ Summary available</span>
-              <span class="sum-date">${formatRelative(w.summaryGeneratedAt)}</span>
-            </div>` : ''}
-          <div class="workshop-tables" id="wt-${esc(w.id)}"></div>
-          ${wTables.length === 0 ? '<div class="workshop-empty">No discussions assigned yet — use the Workshop dropdown on any discussion card.</div>' : ''}
+          <div class="workshop-body-inner" id="wb-${esc(w.id)}"></div>
         </div>`;
 
-      // Render table cards inside the folder
-      const tablesEl = folder.querySelector(`#wt-${w.id}`);
-      if (tablesEl) renderTableCards(wTables, tablesEl);
+      const inner = folder.querySelector(`#wb-${w.id}`);
+      if (inner) {
+        for (const s of wSessions) renderSessionFolder(s, inner);
+        const addBtn = document.createElement('button');
+        addBtn.className = 'workshop-add-session-btn';
+        addBtn.dataset.action = 'add-session-to-ws';
+        addBtn.dataset.wsid = w.id;
+        addBtn.dataset.wsname = w.name;
+        addBtn.textContent = '＋ Add session to this workshop';
+        inner.appendChild(addBtn);
+      }
     }
 
-    // Remove folders for deleted workshops
-    for (const el of Object.values(existingFolders)) el.remove();
+    for (const el of Object.values(existing)) el.remove();
 
-    // Wire up folder actions
     list.onclick = (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
@@ -1055,18 +1402,20 @@
       if (action === 'toggle-ws') {
         if (expandedWorkshops.has(wsid)) expandedWorkshops.delete(wsid);
         else expandedWorkshops.add(wsid);
-        renderWorkshops(currentWorkshops, /* need latest tables */ getLatestTables());
+        renderWorkshops();
         return;
       }
-      if (action === 'gen-summary') { openSummaryModal(wsid, wsname, true); return; }
-      if (action === 'view-summary') { openSummaryModal(wsid, wsname, false); return; }
+      if (action === 'add-session-to-ws') {
+        openQuickSession(wsid);
+        return;
+      }
       if (action === 'rename-ws') {
-        const newName = prompt('New workshop name:', wsname);
-        if (newName?.trim()) apiFetch(`/workshops/${wsid}`, 'PATCH', { name: newName.trim() });
+        const n = prompt('New workshop name:', wsname);
+        if (n?.trim()) apiFetch(`/workshops/${wsid}`, 'PATCH', { name: n.trim() });
         return;
       }
       if (action === 'delete-ws') {
-        if (confirm(`Delete workshop "${wsname}"? The discussions will become unassigned.`)) {
+        if (confirm(`Delete workshop "${wsname}"? Sessions will become unassigned.`)) {
           apiFetch(`/workshops/${wsid}`, 'DELETE');
         }
         return;
@@ -1074,22 +1423,109 @@
     };
   }
 
-  // Store latest tables for re-renders triggered by UI state changes
-  let _latestTables = [];
-  function getLatestTables() { return _latestTables; }
+  // Quick session creation prompt (used from workshop add-session button)
+  async function openQuickSession(workshopId) {
+    const name = prompt('Session name:');
+    if (!name?.trim()) return;
+    await apiFetch('/sessions', 'POST', { name: name.trim(), workshopId });
+  }
 
-  // ── Unassigned active tables ───────────────────────────
-  function renderUnassigned(allTables, workshops) {
-    _latestTables = allTables;
-    const assignedIds = new Set(workshops.flatMap(w => w.tableIds));
-    const unassigned = allTables.filter(t => !assignedIds.has(t.id));
+  // ── Session folders ────────────────────────────────────
+  function renderSessionFolder(s, container) {
+    let folder = container.querySelector(`.session-folder[data-id="${s.id}"]`);
+    if (!folder) {
+      folder = document.createElement('div');
+      folder.className = 'session-folder';
+      folder.dataset.id = s.id;
+      container.appendChild(folder);
+      if (!expandedSessions.has(s.id)) expandedSessions.add(s.id);
+    }
 
-    const label = document.getElementById('unassigned-label');
+    const isOpen = expandedSessions.has(s.id);
+    const sTables = currentTables.filter(t => s.tableIds.includes(t.id));
+    const hasSummary = !!s.summary;
+
+    folder.innerHTML = `
+      <div class="session-header" data-action="toggle-ses" data-sesid="${esc(s.id)}">
+        <span class="session-chevron ${isOpen ? 'open' : ''}">▶</span>
+        <span class="session-name">${esc(s.name)}</span>
+        <span class="session-count">${sTables.length} group${sTables.length !== 1 ? 's' : ''}</span>
+        <div class="session-actions" onclick="event.stopPropagation()">
+          ${hasSummary ? `<button class="btn-sm btn-sm-summary" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">✦ Summary</button>` : ''}
+          <button class="btn-sm btn-sm-primary" data-action="gen-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">${hasSummary ? '↺' : '✦'}</button>
+          <button class="btn-sm" data-action="rename-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Rename</button>
+          <button class="btn-sm btn-sm-danger" data-action="delete-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Delete</button>
+        </div>
+      </div>
+      <div class="session-body ${isOpen ? 'open' : ''}">
+        ${hasSummary ? `
+          <div class="session-summary-bar" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}" onclick="event.stopPropagation()">
+            <span>✦ Summary available</span>
+            <span class="sum-date">${formatRelative(s.summaryGeneratedAt)}</span>
+          </div>` : ''}
+        <div class="session-tables" id="st-${esc(s.id)}"></div>
+        ${sTables.length === 0 ? '<div class="session-empty">No groups assigned — use the Session dropdown on any group card.</div>' : ''}
+      </div>`;
+
+    const tablesEl = folder.querySelector(`#st-${s.id}`);
+    if (tablesEl) renderTableCards(sTables, tablesEl);
+
+    // Wire session header actions
+    folder.onclick = (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      e.stopPropagation();
+      const { action, sesid, sesname } = btn.dataset;
+      if (action === 'toggle-ses') {
+        if (expandedSessions.has(sesid)) expandedSessions.delete(sesid);
+        else expandedSessions.add(sesid);
+        const body = folder.querySelector('.session-body');
+        const chev = folder.querySelector('.session-chevron');
+        body.classList.toggle('open', expandedSessions.has(sesid));
+        chev.classList.toggle('open', expandedSessions.has(sesid));
+        return;
+      }
+      if (action === 'gen-sum')   { openSummaryModal(sesid, sesname, true);  return; }
+      if (action === 'view-sum')  { openSummaryModal(sesid, sesname, false); return; }
+      if (action === 'rename-ses') {
+        const n = prompt('New session name:', sesname);
+        if (n?.trim()) apiFetch(`/sessions/${sesid}`, 'PATCH', { name: n.trim() });
+        return;
+      }
+      if (action === 'delete-ses') {
+        if (confirm(`Delete session "${sesname}"? Groups will become unassigned.`)) {
+          apiFetch(`/sessions/${sesid}`, 'DELETE');
+        }
+        return;
+      }
+    };
+  }
+
+  // ── Unassigned sessions (not in any workshop) ──────────
+  function renderUnassignedSessions() {
+    const section = document.getElementById('unassigned-sessions-section');
+    const unassigned = currentSessions.filter(s => !s.workshopId);
+
+    section.innerHTML = '';
+    if (!unassigned.length) return;
+
+    const label = document.createElement('div');
+    label.className = 'subsection-label';
+    label.textContent = 'Unassigned Sessions';
+    section.appendChild(label);
+
+    for (const s of unassigned) renderSessionFolder(s, section);
+  }
+
+  // ── Unassigned groups (not in any session) ─────────────
+  function renderUnassignedGroups() {
+    const assignedIds = new Set(currentSessions.flatMap(s => s.tableIds));
+    const unassigned = currentTables.filter(t => !assignedIds.has(t.id));
+
+    const label = document.getElementById('unassigned-groups-label');
     const grid  = document.getElementById('tables-grid');
 
-    // Show "Unassigned" label only if there are both workshops and unassigned tables
-    label.style.display = (workshops.length > 0 && unassigned.length > 0) ? 'block' : 'none';
-
+    label.style.display = (currentSessions.length > 0 && unassigned.length > 0) ? 'block' : 'none';
     renderTableCards(unassigned, grid);
   }
 
@@ -1110,7 +1546,7 @@
           card.classList.toggle('expanded', expandedIds.has(t.id));
         });
         container.appendChild(card);
-        // Remove from old waiting list if present
+        // Remove from waiting list if present
         const waitingCard = document.getElementById('waiting-list').querySelector(`[data-id="${t.id}"]`);
         if (waitingCard) waitingCard.remove();
       }
@@ -1127,12 +1563,12 @@
 
       card.className = 'table-card' + (isExpanded ? ' expanded' : '');
 
-      // Workshop assign select options
-      const wsOptions = `<option value="">Unassigned</option>` +
-        currentWorkshops.map(w =>
-          `<option value="${esc(w.id)}" ${w.tableIds.includes(t.id) ? 'selected' : ''}>${esc(w.name)}</option>`
+      // Session assign select options
+      const sesOptions = `<option value="">— No session —</option>` +
+        currentSessions.map(s =>
+          `<option value="${esc(s.id)}" ${s.tableIds.includes(t.id) ? 'selected' : ''}>${esc(s.name)}</option>`
         ).join('') +
-        `<option value="__new__">＋ Create new workshop…</option>`;
+        `<option value="__new__">＋ Create new session…</option>`;
 
       const clusterHtml = board.clusters.length
         ? board.clusters.map(c => {
@@ -1179,8 +1615,8 @@
           ${quotesHtml ? `<div class="detail-section"><div class="detail-label">Quotes</div>${quotesHtml}</div>` : ''}
           ${flagsHtml ? `<div class="detail-section"><div class="detail-label">Open Questions &amp; Flags</div>${flagsHtml}</div>` : ''}
           <div class="assign-row">
-            <div class="detail-label" style="margin:0;flex-shrink:0;">Workshop</div>
-            <select class="assign-select" data-action="assign-ws" data-tableid="${esc(t.id)}">${wsOptions}</select>
+            <div class="detail-label" style="margin:0;flex-shrink:0;">Session</div>
+            <select class="assign-select" data-action="assign-ses" data-tableid="${esc(t.id)}">${sesOptions}</select>
           </div>
           <div class="card-bottom-actions">
             <div class="pod-link-row">
@@ -1193,56 +1629,48 @@
         </div>`;
     }
 
-    // Remove stale cards
     for (const el of Object.values(existing)) el.remove();
 
-    // Wire up actions on this container
     container.onclick = (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const { action, tableid, url, name } = btn.dataset;
-      if (action === 'copy-link') {
-        copyText(url, btn);
-        return;
-      }
+      if (action === 'copy-link') { copyText(url, btn); return; }
       if (action === 'archive-table') {
-        if (confirm(`Archive "${name}"? The discussion data is preserved and can be restored.`)) {
+        if (confirm(`Archive "${name}"? Data is preserved and can be restored.`)) {
           apiFetch(`/tables/${tableid}/archive`);
         }
         return;
       }
     };
 
-    // Wire up assign-workshop selects
-    for (const sel of container.querySelectorAll('select[data-action="assign-ws"]')) {
+    // Wire assign-session selects
+    for (const sel of container.querySelectorAll('select[data-action="assign-ses"]')) {
       sel.onchange = async () => {
         const tableId = sel.dataset.tableid;
-        const wsId = sel.value;
-        if (wsId === '__new__') {
-          const newName = prompt('New workshop name:');
+        const sesId = sel.value;
+        if (sesId === '__new__') {
+          const newName = prompt('New session name:');
           if (newName?.trim()) {
-            const res = await apiFetch('/workshops', 'POST', { name: newName.trim() });
+            const res = await apiFetch('/sessions', 'POST', { name: newName.trim() });
             if (res.ok) {
-              const newWs = await res.json();
-              await apiFetch(`/workshops/${newWs.id}/assign/${tableId}`);
+              const newSes = await res.json();
+              await apiFetch(`/sessions/${newSes.id}/assign/${tableId}`);
             }
           } else {
-            sel.value = currentWorkshops.find(w => w.tableIds.includes(tableId))?.id ?? '';
+            sel.value = currentSessions.find(s => s.tableIds.includes(tableId))?.id ?? '';
           }
-        } else if (wsId) {
-          await apiFetch(`/workshops/${wsId}/assign/${tableId}`);
+        } else if (sesId) {
+          await apiFetch(`/sessions/${sesId}/assign/${tableId}`);
         } else {
-          // Unassign from current workshop
-          const curWs = currentWorkshops.find(w => w.tableIds.includes(tableId));
-          if (curWs) await apiFetch(`/workshops/${curWs.id}/unassign/${tableId}`);
+          const curSes = currentSessions.find(s => s.tableIds.includes(tableId));
+          if (curSes) await apiFetch(`/sessions/${curSes.id}/unassign/${tableId}`);
         }
       };
     }
   }
 
   // ── Waiting sessions ───────────────────────────────────
-  const renderedWaiting = new Set();
-
   function renderWaitingSessions(sessions) {
     const list = document.getElementById('waiting-list');
     for (const el of list.querySelectorAll('.waiting-card')) {
@@ -1282,7 +1710,7 @@
     card.querySelector('.btn-copy').addEventListener('click', (e) => copyText(e.currentTarget.dataset.url, e.currentTarget));
     card.querySelector('.btn-delete-waiting').addEventListener('click', (e) => {
       const id = e.currentTarget.dataset.id;
-      if (confirm('Remove this waiting session?')) {
+      if (confirm('Remove this waiting group?')) {
         apiFetch(`/tables/${id}`, 'DELETE').then(() => card.remove());
       }
     });
@@ -1294,7 +1722,7 @@
   // ── Archived section ───────────────────────────────────
   function renderArchived(archived) {
     const section = document.getElementById('archived-section');
-    const list = document.getElementById('archived-list');
+    const list    = document.getElementById('archived-list');
     const countEl = document.getElementById('archived-count');
     section.style.display = archived.length ? 'block' : 'none';
     countEl.textContent = archived.length;
@@ -1312,9 +1740,7 @@
           <div class="archived-summary-text">${esc(t.summary || 'No summary')}</div>
           <button class="btn-restore" data-id="${esc(t.id)}">Restore</button>
           <button class="btn-delete-archived" data-id="${esc(t.id)}" title="Delete permanently">🗑</button>`;
-        card.querySelector('.btn-restore').addEventListener('click', () => {
-          apiFetch(`/tables/${t.id}/unarchive`);
-        });
+        card.querySelector('.btn-restore').addEventListener('click', () => apiFetch(`/tables/${t.id}/unarchive`));
         card.querySelector('.btn-delete-archived').addEventListener('click', () => {
           if (confirm(`Permanently delete "${t.name || t.id}"? This cannot be undone.`)) {
             apiFetch(`/tables/${t.id}`, 'DELETE');
@@ -1327,7 +1753,6 @@
     for (const el of Object.values(existing)) el.remove();
   }
 
-  // Archived toggle
   document.getElementById('archived-toggle').addEventListener('click', () => {
     archivedOpen = !archivedOpen;
     document.getElementById('archived-list').classList.toggle('open', archivedOpen);
@@ -1382,13 +1807,13 @@
   }
 
   // ── Summary modal ──────────────────────────────────────
-  const modal       = document.getElementById('summary-modal');
-  const modalTitle  = document.getElementById('modal-title');
-  const modalSub    = document.getElementById('modal-subtitle');
-  const modalBody   = document.getElementById('modal-body');
+  const modal        = document.getElementById('summary-modal');
+  const modalTitle   = document.getElementById('modal-title');
+  const modalSub     = document.getElementById('modal-subtitle');
+  const modalBody    = document.getElementById('modal-body');
   const modalCopyBtn = document.getElementById('modal-copy-btn');
   const modalRegenBtn = document.getElementById('modal-regen-btn');
-  let _currentModalWsId = null;
+  let _currentModalSesId = null;
   let _currentModalMd = '';
 
   document.getElementById('modal-close-x').addEventListener('click', () => modal.close());
@@ -1402,33 +1827,31 @@
   });
 
   modalRegenBtn.addEventListener('click', () => {
-    if (_currentModalWsId) openSummaryModal(_currentModalWsId, modalTitle.textContent, true);
+    if (_currentModalSesId) openSummaryModal(_currentModalSesId, modalTitle.textContent, true);
   });
 
-  function openSummaryModal(wsId, wsName, generate) {
-    _currentModalWsId = wsId;
+  function openSummaryModal(sesId, sesName, generate) {
+    _currentModalSesId = sesId;
     _currentModalMd = '';
-    modalTitle.textContent = wsName;
+    modalTitle.textContent = sesName;
     modalBody.innerHTML = '';
     modal.showModal();
 
-    const ws = currentWorkshops.find(w => w.id === wsId);
-    if (!generate && ws?.summary) {
-      // Show cached summary
-      showSummaryInModal(ws.summary, ws.summaryGeneratedAt);
+    const ses = currentSessions.find(s => s.id === sesId);
+    if (!generate && ses?.summary) {
+      showSummaryInModal(ses.summary, ses.summaryGeneratedAt);
       return;
     }
 
-    // Show generating state
     modalSub.textContent = 'Generating…';
     modalBody.innerHTML = '<div class="modal-generating">Scribe is reading all discussions and synthesising a report…</div>';
     modalRegenBtn.style.display = 'none';
     modalCopyBtn.style.display = 'none';
 
-    apiFetch(`/workshops/${wsId}/summary`).then(async res => {
+    apiFetch(`/sessions/${sesId}/summary`).then(async res => {
       if (!res.ok) {
         const errText = await res.text();
-        modalBody.innerHTML = `<p style="color:var(--red);padding:1rem;">Failed to generate summary: ${esc(errText)}</p>`;
+        modalBody.innerHTML = `<p style="color:var(--red);padding:1rem;">Failed: ${esc(errText)}</p>`;
         modalSub.textContent = 'Error';
         return;
       }
@@ -1508,7 +1931,8 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  connect();
+  // ── Boot ───────────────────────────────────────────────
+  initAuth();
 })();
 </script>
 </body>

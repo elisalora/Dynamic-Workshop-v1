@@ -1,6 +1,6 @@
 import { callAnthropic } from "./anthropic.js";
 import {
-  workshops,
+  sessions,
   tables,
   archivedTables,
   broadcastConsole,
@@ -9,17 +9,17 @@ import {
 } from "./state.js";
 import { logger } from "./lib/logger.js";
 
-export async function generateWorkshopSummary(workshopId: string): Promise<string> {
-  const workshop = workshops.get(workshopId);
-  if (!workshop) throw new Error("Workshop not found");
+export async function generateSessionSummary(sessionId: string): Promise<string> {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error("Session not found");
 
   const tableData: TableState[] = [];
-  for (const id of workshop.tableIds) {
+  for (const id of session.tableIds) {
     const t = tables.get(id) ?? archivedTables.get(id);
     if (t) tableData.push(t);
   }
 
-  if (!tableData.length) throw new Error("No discussions assigned to this workshop yet");
+  if (!tableData.length) throw new Error("No discussions assigned to this session yet");
 
   const tablesText = tableData
     .map((t) => {
@@ -49,11 +49,11 @@ ${excerpt ? `\nTranscript excerpt: ${excerpt}` : ""}`;
     .join("\n\n---\n\n");
 
   const system = `You are an expert workshop facilitator and synthesiser.
-Your task: write a clear, insightful summary of a workshop with ${tableData.length} parallel discussion table(s).
+Your task: write a clear, insightful summary of a session with ${tableData.length} parallel discussion table(s).
 Be specific and concrete — use the actual content from the discussions, not generic filler.
 Output ONLY valid Markdown. No code fences, no preamble.`;
 
-  const userContent = `Workshop: "${workshop.name}"
+  const userContent = `Session: "${session.name}"
 
 ${tablesText}
 
@@ -65,7 +65,7 @@ Write a structured report with exactly these sections (use ## headings):
 ## Open Questions & Flags
 ## Suggested Next Steps`;
 
-  logger.info({ workshopId, tables: tableData.length }, "Generating workshop summary");
+  logger.info({ sessionId, tables: tableData.length }, "Generating session summary");
 
   const raw = await callAnthropic(system, userContent);
   // Strip any accidental markdown fences
@@ -74,10 +74,10 @@ Write a structured report with exactly these sections (use ## headings):
     .replace(/\n?```$/m, "")
     .trim();
 
-  workshop.summary = cleaned;
-  workshop.summaryGeneratedAt = Date.now();
+  session.summary = cleaned;
+  session.summaryGeneratedAt = Date.now();
   broadcastConsole(consoleSnapshot());
 
-  logger.info({ workshopId }, "Workshop summary complete");
+  logger.info({ sessionId }, "Session summary complete");
   return cleaned;
 }

@@ -89,32 +89,62 @@ export interface SessionConfig {
   createdAt: number;
 }
 
-export interface Workshop {
+/**
+ * Session — a time-block or phase within a workshop (e.g. "Day 1 Morning").
+ * Contains discussion groups (tables). Was called "Workshop" in earlier versions.
+ */
+export interface Session {
   id: string;
   name: string;
-  tableIds: string[]; // ordered list of assigned table IDs
+  workshopId?: string; // optional parent workshop
+  tableIds: string[];  // ordered list of assigned table IDs
   createdAt: number;
   summary?: string;
   summaryGeneratedAt?: number;
+}
+
+/**
+ * Workshop — the top-level event container (e.g. "Robotics Workshop").
+ * Contains one or more sessions.
+ */
+export interface Workshop {
+  id: string;
+  name: string;
+  sessionIds: string[];
+  createdAt: number;
 }
 
 export const tables = new Map<string, TableState>();
 export const archivedTables = new Map<string, TableState>();
 export const themeCandidates = new Map<string, ThemeCandidate>();
 export const sessionConfigs = new Map<string, SessionConfig>();
+export const sessions = new Map<string, Session>();
 export const workshops = new Map<string, Workshop>();
 
-export function createSession(name: string, questions: string[]): SessionConfig {
-  // Short readable token: 6 uppercase alphanumeric chars
+/** Create a pod group config (name + questions for a discussion table). */
+export function createGroup(name: string, questions: string[]): SessionConfig {
   const token = Math.random().toString(36).slice(2, 8).toUpperCase();
   const config: SessionConfig = { tableId: token, name, questions, createdAt: Date.now() };
   sessionConfigs.set(token, config);
   return config;
 }
 
+/** Create a session (middle tier), optionally nested under a workshop. */
+export function createSession(name: string, workshopId?: string): Session {
+  const id = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const s: Session = { id, name, workshopId, tableIds: [], createdAt: Date.now() };
+  sessions.set(id, s);
+  if (workshopId) {
+    const w = workshops.get(workshopId);
+    if (w && !w.sessionIds.includes(id)) w.sessionIds.push(id);
+  }
+  return s;
+}
+
+/** Create a top-level workshop event. */
 export function createWorkshop(name: string): Workshop {
   const id = Math.random().toString(36).slice(2, 8).toUpperCase();
-  const w: Workshop = { id, name, tableIds: [], createdAt: Date.now() };
+  const w: Workshop = { id, name, sessionIds: [], createdAt: Date.now() };
   workshops.set(id, w);
   return w;
 }
@@ -125,10 +155,10 @@ export function archiveTable(tableId: string): void {
   if (!table) return;
   tables.delete(tableId);
   archivedTables.set(tableId, table);
-  // Remove from all workshops
-  for (const w of workshops.values()) {
-    const idx = w.tableIds.indexOf(tableId);
-    if (idx !== -1) w.tableIds.splice(idx, 1);
+  // Remove from all sessions
+  for (const s of sessions.values()) {
+    const idx = s.tableIds.indexOf(tableId);
+    if (idx !== -1) s.tableIds.splice(idx, 1);
   }
   // Close the pod socket — ws-handler's close handler will call disconnectDeepgram
   const ws = podSockets.get(tableId);
@@ -204,10 +234,10 @@ export function sendToPod(tableId: string, msg: unknown): void {
 export function consoleSnapshot() {
   const tableArr = Array.from(tables.values()).map((t) => {
     const cfg = sessionConfigs.get(t.id);
-    // Find which workshop this table belongs to
-    let workshopId: string | null = null;
-    for (const w of workshops.values()) {
-      if (w.tableIds.includes(t.id)) { workshopId = w.id; break; }
+    // Find which session this table belongs to
+    let sessionId: string | null = null;
+    for (const s of sessions.values()) {
+      if (s.tableIds.includes(t.id)) { sessionId = s.id; break; }
     }
     return {
       id: t.id,
@@ -217,11 +247,11 @@ export function consoleSnapshot() {
       summary: t.summary,
       metrics: t.metrics,
       board: t.board,
-      workshopId,
+      sessionId,
     };
   });
 
-  // Sessions created but pod not yet connected
+  // Groups created but pod not yet connected
   const waitingArr = Array.from(sessionConfigs.values())
     .filter((s) => !tables.has(s.tableId))
     .map((s) => ({
@@ -236,13 +266,21 @@ export function consoleSnapshot() {
     return (order[a.state] ?? 9) - (order[b.state] ?? 9);
   });
 
+  const sessionArr = Array.from(sessions.values()).map((s) => ({
+    id: s.id,
+    name: s.name,
+    workshopId: s.workshopId ?? null,
+    tableIds: s.tableIds,
+    createdAt: s.createdAt,
+    summary: s.summary ?? null,
+    summaryGeneratedAt: s.summaryGeneratedAt ?? null,
+  }));
+
   const workshopArr = Array.from(workshops.values()).map((w) => ({
     id: w.id,
     name: w.name,
-    tableIds: w.tableIds,
+    sessionIds: w.sessionIds,
     createdAt: w.createdAt,
-    summary: w.summary ?? null,
-    summaryGeneratedAt: w.summaryGeneratedAt ?? null,
   }));
 
   const archivedArr = Array.from(archivedTables.values()).map((t) => {
@@ -261,6 +299,7 @@ export function consoleSnapshot() {
     tables: tableArr,
     waitingSessions: waitingArr,
     candidates: candidateArr,
+    sessions: sessionArr,
     workshops: workshopArr,
     archivedTables: archivedArr,
   };
