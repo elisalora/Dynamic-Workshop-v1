@@ -345,3 +345,42 @@
 {"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784319782290}
 {"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784319787350}
 {"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784319792282}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784319797313}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"What if we started from the user's perspective?"},"ts":1784319799859}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784319799859}
+{"kind":"scribe","table":"T1","summary":"Team questioning core assumptions about ownership, success metrics, and whether they're solving for communication versus process issues while emphasizing user perspective.","opCount":2,"ts":1784319799859}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784319802281}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784319807284}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784319812285}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784319844268}
+{"kind":"scribe","table":"T1","summary":"The team is reinforcing their understanding that they're conflating two distinct problems and emphasizing the need to prioritize user experience and establish feedback loops before scaling.","opCount":1,"ts":1784319844268}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784319859291}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784319861905}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784319867289}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784319872285}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784319877285}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784319882287}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784319887284}
+{"kind":"scribe","table":"T1","summary":"Team returning to core ownership question while probing whether the real issue is communication rather than process, seeking ways to test assumptions incrementally.","opCount":0,"ts":1784319889345}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784319892299}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784319897294}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784319902289}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784319907299}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784319912292}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784319917374}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784319922290}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784319930574}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784319931900}
+{"kind":"scribe","table":"T1","summary":"Team reiterates focus on user-first approach and testing assumptions incrementally, while continuing to grapple with the centralized vs distributed ownership tension.","opCount":0,"ts":1784319934251}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784319936904}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784319941901}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784319946899}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784319952284}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784319957286}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784319962285}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784319967292}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784319972289}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784319977294}
+{"kind":"scribe","table":"T1","summary":"The conversation reinforces existing themes with no genuinely new content emerging.","opCount":0,"ts":1784319978840}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784319981898}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784319986908}
