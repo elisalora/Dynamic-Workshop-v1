@@ -293,6 +293,14 @@
     from { opacity:0; transform: translateX(-8px); }
     to   { opacity:1; transform: translateX(0); }
   }
+  .more-indicator {
+    font-size: clamp(0.72rem, 1.2vw, 0.95rem);
+    color: var(--accent-light);
+    font-style: italic;
+    margin-top: 0.2rem;
+    padding-left: 1.1em;
+    flex-shrink: 0;
+  }
 
   /* ── Bottom strip ────────────────────────────────────── */
   #bottom-strip {
@@ -737,24 +745,43 @@
         const ul = document.createElement('ul');
         ul.className = 'idea-list';
 
+        // overflow indicator
+        const more = document.createElement('div');
+        more.className = 'more-indicator';
+        more.style.display = 'none';
+
         card.appendChild(bot);
         card.appendChild(label);
         card.appendChild(ul);
+        card.appendChild(more);
         grid.appendChild(card);
-        clusterEls[cluster.id] = { card, ul, ideaIds: new Set(), botIdx };
+        clusterEls[cluster.id] = { card, ul, more, ideaIds: new Set(), rendered: 0 };
       }
 
-      const { card, ul, ideaIds } = clusterEls[cluster.id];
+      const MAX_IDEAS = 6;
+      const { card, ul, more, ideaIds } = clusterEls[cluster.id];
       if (cluster.emphasized) card.classList.add('emphasized');
 
       for (const idea of ideas) {
         if (!ideaIds.has(idea.id)) {
           ideaIds.add(idea.id);
-          const li = document.createElement('li');
-          li.className = 'idea-item';
-          li.textContent = idea.text;
-          ul.appendChild(li);
+          if (clusterEls[cluster.id].rendered < MAX_IDEAS) {
+            const li = document.createElement('li');
+            li.className = 'idea-item';
+            li.textContent = idea.text;
+            ul.appendChild(li);
+            clusterEls[cluster.id].rendered++;
+          }
         }
+      }
+
+      // update overflow indicator
+      const hidden = ideaIds.size - clusterEls[cluster.id].rendered;
+      if (hidden > 0) {
+        more.textContent = `+${hidden} more`;
+        more.style.display = 'block';
+      } else {
+        more.style.display = 'none';
       }
     }
 
