@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   Alert,
   Animated,
@@ -80,6 +80,7 @@ export function TableCard({ table, workshops }: Props) {
   const colors = useColors();
   const { archiveTable, assignTable, unassignTable } = useConsole();
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Swipe-to-archive
   const translateX = useRef(new Animated.Value(0)).current;
@@ -156,9 +157,17 @@ export function TableCard({ table, workshops }: Props) {
   const handleShare = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const url = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${table.id}`;
-    try {
-      await Share.share({ url, message: url });
-    } catch (_) {}
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch (_) {}
+    } else {
+      try {
+        await Share.share({ url, message: url });
+      } catch (_) {}
+    }
   };
 
   return (
@@ -290,10 +299,16 @@ export function TableCard({ table, workshops }: Props) {
 
                   <Pressable
                     onPress={handleShare}
-                    style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
+                    style={[styles.actionBtn, { backgroundColor: copied ? colors.statusFlowingBg : colors.muted, borderColor: colors.border }]}
                   >
-                    <Ionicons name="share-outline" size={14} color={colors.mutedForeground} />
-                    <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Share Pod</Text>
+                    <Ionicons
+                      name={copied ? 'checkmark-outline' : 'share-outline'}
+                      size={14}
+                      color={copied ? colors.statusFlowingFg : colors.mutedForeground}
+                    />
+                    <Text style={[styles.actionBtnText, { color: copied ? colors.statusFlowingFg : colors.mutedForeground }]}>
+                      {copied ? 'Copied!' : 'Share Pod'}
+                    </Text>
                   </Pressable>
 
                   <Pressable

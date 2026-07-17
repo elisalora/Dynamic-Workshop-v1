@@ -276,13 +276,22 @@ function WorkshopFolderWrapped({
 function WaitingCard({ session }: { session: import('@/context/ConsoleContext').WaitingSession }) {
   const colors = useColors();
   const { deleteTable } = useConsole();
+  const [copied, setCopied] = useState(false);
 
   const handleShare = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const url = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${session.tableId}`;
-    try {
-      await Share.share({ url, message: url });
-    } catch (_) {}
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch (_) {}
+    } else {
+      try {
+        await Share.share({ url, message: url });
+      } catch (_) {}
+    }
   };
 
   return (
@@ -324,10 +333,16 @@ function WaitingCard({ session }: { session: import('@/context/ConsoleContext').
         <Pressable
           onPress={handleShare}
           hitSlop={4}
-          style={[styles.shareBtn, { backgroundColor: colors.primary }]}
+          style={[styles.shareBtn, { backgroundColor: copied ? colors.statusFlowingBg : colors.primary }]}
         >
-          <Ionicons name="share-outline" size={13} color={colors.primaryForeground} />
-          <Text style={[styles.shareBtnText, { color: colors.primaryForeground }]}>Share</Text>
+          <Ionicons
+            name={copied ? 'checkmark-outline' : 'share-outline'}
+            size={13}
+            color={copied ? colors.statusFlowingFg : colors.primaryForeground}
+          />
+          <Text style={[styles.shareBtnText, { color: copied ? colors.statusFlowingFg : colors.primaryForeground }]}>
+            {copied ? 'Copied!' : 'Share'}
+          </Text>
         </Pressable>
       </View>
     </View>
