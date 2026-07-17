@@ -1042,6 +1042,7 @@
     <div class="modal-footer">
       <button class="btn btn-dismiss" id="modal-regen-btn">↺ Regenerate</button>
       <div class="modal-footer-spacer"></div>
+      <button class="btn btn-edit" id="modal-share-btn">🔗 Copy share link</button>
       <button class="btn btn-reveal" id="modal-copy-btn">Copy as Markdown</button>
       <button class="btn btn-edit" id="modal-close-btn">Close</button>
     </div>
@@ -1807,11 +1808,12 @@
   }
 
   // ── Summary modal ──────────────────────────────────────
-  const modal        = document.getElementById('summary-modal');
-  const modalTitle   = document.getElementById('modal-title');
-  const modalSub     = document.getElementById('modal-subtitle');
-  const modalBody    = document.getElementById('modal-body');
-  const modalCopyBtn = document.getElementById('modal-copy-btn');
+  const modal         = document.getElementById('summary-modal');
+  const modalTitle    = document.getElementById('modal-title');
+  const modalSub      = document.getElementById('modal-subtitle');
+  const modalBody     = document.getElementById('modal-body');
+  const modalCopyBtn  = document.getElementById('modal-copy-btn');
+  const modalShareBtn = document.getElementById('modal-share-btn');
   const modalRegenBtn = document.getElementById('modal-regen-btn');
   let _currentModalSesId = null;
   let _currentModalMd = '';
@@ -1823,6 +1825,14 @@
     navigator.clipboard.writeText(_currentModalMd).then(() => {
       modalCopyBtn.textContent = '✓ Copied!';
       setTimeout(() => { modalCopyBtn.textContent = 'Copy as Markdown'; }, 2000);
+    });
+  });
+
+  modalShareBtn.addEventListener('click', () => {
+    const reportUrl = `${location.origin}${base}/report/${_currentModalSesId}`;
+    navigator.clipboard.writeText(reportUrl).then(() => {
+      modalShareBtn.textContent = '✓ Link copied!';
+      setTimeout(() => { modalShareBtn.textContent = '🔗 Copy share link'; }, 2000);
     });
   });
 
@@ -1847,6 +1857,7 @@
     modalBody.innerHTML = '<div class="modal-generating">Scribe is reading all discussions and synthesising a report…</div>';
     modalRegenBtn.style.display = 'none';
     modalCopyBtn.style.display = 'none';
+    modalShareBtn.style.display = 'none';
 
     apiFetch(`/sessions/${sesId}/summary`).then(async res => {
       if (!res.ok) {
@@ -1868,6 +1879,7 @@
     modalBody.innerHTML = `<div class="md">${renderMarkdown(markdown)}</div>`;
     modalRegenBtn.style.display = '';
     modalCopyBtn.style.display = '';
+    modalShareBtn.style.display = '';
   }
 
   // Minimal markdown → HTML (handles ##, ###, **, -, > blockquotes)
