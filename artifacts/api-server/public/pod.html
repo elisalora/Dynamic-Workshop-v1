@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Scribe Board</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@400;600&display=swap');
+
+  :root {
+    --paper: #f5f0e8;
+    --ink: #1a1410;
+    --ink-muted: #5a4a3a;
+    --accent: #8b4513;
+    --accent-light: #c8956a;
+    --card-bg: #faf7f2;
+    --card-border: #d4c4a8;
+    --quote-bg: #fff9f0;
+    --synthesis-bg: #2c1810;
+    --synthesis-text: #f5f0e8;
+    --flag-bg: #e8d5b0;
+    --flag-text: #5a3a0a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* ── Start screen ──────────────────────────────────────── */
+  #start-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 2rem;
+    text-align: center;
+    padding: 2rem;
+  }
+  #start-screen h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 6vw, 4rem);
+    color: var(--ink);
+  }
+  #start-screen p {
+    font-size: 1.2rem;
+    color: var(--ink-muted);
+    max-width: 36ch;
+    line-height: 1.6;
+  }
+  #start-btn {
+    background: var(--accent);
+    color: var(--paper);
+    border: none;
+    padding: 1.25rem 3rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    letter-spacing: 0.05em;
+  }
+  #start-btn:hover { background: #6b3410; }
+  #start-btn:active { transform: scale(0.97); }
+  .table-label {
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ── Board ─────────────────────────────────────────────── */
+  #board {
+    display: none;
+    padding: 1.5rem;
+    padding-bottom: 5rem; /* room for ticker */
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  #board.active { display: block; }
+
+  .board-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--card-border);
+  }
+  .board-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    flex: 1;
+  }
+  .status-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #999;
+    flex-shrink: 0;
+  }
+  .status-dot.connected { background: #5a8a5a; }
+  .status-dot.recording { background: var(--accent); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Synthesis card (pinned top) ───────────────────────── */
+  #synthesis-card {
+    background: var(--synthesis-bg);
+    color: var(--synthesis-text);
+    border-radius: 6px;
+    padding: 1.25rem 1.75rem;
+    margin-bottom: 1.5rem;
+    font-family: 'Source Serif 4', serif;
+    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    line-height: 1.5;
+    display: none;
+    animation: slideDown 0.5s ease-out;
+  }
+  #synthesis-card.visible { display: block; }
+  #synthesis-card .synthesis-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    opacity: 0.7;
+    margin-bottom: 0.5rem;
+  }
+
+  /* ── Cluster grid ──────────────────────────────────────── */
+  #cluster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .cluster-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--card-border);
+    border-radius: 6px;
+    padding: 1.25rem;
+    animation: fadeUp 0.4s ease-out;
+  }
+  .cluster-card.emphasized {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-light);
+  }
+  .cluster-label {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+    line-height: 1.2;
+  }
+  .idea-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .idea-item {
+    font-size: clamp(0.9rem, 1.8vw, 1.15rem);
+    line-height: 1.4;
+    color: var(--ink);
+    padding-left: 1.1rem;
+    position: relative;
+  }
+  .idea-item::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--accent-light);
+  }
+  .idea-item.new-idea { animation: fadeUp 0.35s ease-out; }
+
+  /* ── Quotes ────────────────────────────────────────────── */
+  #quotes-section { margin-bottom: 1.5rem; }
+  .quote-card {
+    background: var(--quote-bg);
+    border-left: 4px solid var(--accent-light);
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+    border-radius: 0 4px 4px 0;
+    animation: fadeUp 0.4s ease-out;
+  }
+  .quote-text {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .quote-time {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Flags ─────────────────────────────────────────────── */
+  #flags-rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  .flag-pill {
+    background: var(--flag-bg);
+    color: var(--flag-text);
+    border-radius: 100px;
+    padding: 0.4rem 1rem;
+    font-size: clamp(0.8rem, 1.5vw, 1rem);
+    font-weight: 600;
+    animation: fadeUp 0.35s ease-out;
+  }
+  .flag-pill .kind-badge {
+    font-size: 0.7em;
+    opacity: 0.7;
+    margin-right: 0.4em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Ticker ────────────────────────────────────────────── */
+  #ticker {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0.75rem 1.5rem;
+    font-size: clamp(0.85rem, 1.5vw, 1.05rem);
+    line-height: 1.4;
+    z-index: 100;
+    min-height: 3.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  #ticker .ticker-label {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    opacity: 0.5;
+    white-space: nowrap;
+  }
+  #ticker-text {
+    opacity: 0.9;
+    transition: opacity 0.3s;
+    font-style: italic;
+  }
+
+  /* ── Animations ────────────────────────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Start screen ─────────────────────────────────────── -->
+<div id="start-screen">
+  <h1>Scribe Pilot</h1>
+  <div class="table-label" id="table-display">Table —</div>
+  <p>Click to allow microphone access and begin the live scribe board.</p>
+  <button id="start-btn">Start Recording</button>
+  <div id="demo-note" style="display:none;color:var(--accent);font-size:0.9rem;font-weight:600;">Demo mode active — no mic needed</div>
+</div>
+
+<!-- ── Main board ───────────────────────────────────────── -->
+<div id="board">
+  <div class="board-header">
+    <h2 id="board-title">Scribe Board</h2>
+    <div class="status-dot" id="status-dot"></div>
+  </div>
+
+  <div id="synthesis-card">
+    <div class="synthesis-label">Emerging Synthesis</div>
+    <div id="synthesis-text"></div>
+  </div>
+
+  <div id="cluster-grid"></div>
+  <div id="quotes-section"></div>
+  <div id="flags-rail"></div>
+</div>
+
+<div id="ticker">
+  <span class="ticker-label">Live</span>
+  <span id="ticker-text">Waiting for speech…</span>
+</div>
+
+<script>
+(function() {
+  const params = new URLSearchParams(location.search);
+  const tableId = params.get('table') || 'T1';
+  const topic   = params.get('topic') || '';
+  const demo    = params.get('demo') === '1';
+
+  document.getElementById('table-display').textContent = 'Table ' + tableId;
+  if (demo) document.getElementById('demo-note').style.display = 'block';
+
+  let ws = null;
+  let mediaRecorder = null;
+  let recorderTimer = null;
+  let stream = null;
+  let demoTimer = null;
+
+  const DEMO_LINES = [
+    "I think we need to focus on the user experience first before we scale.",
+    "There's real tension between moving fast and maintaining quality standards.",
+    "What if we built a feedback loop into the process itself?",
+    "The data suggests most users drop off at the onboarding step.",
+    "We keep circling back to the question of ownership — who decides?",
+    "That's a really interesting tension between centralised and distributed approaches.",
+    "How might we test this assumption without building the whole thing?",
+    "I wonder if the problem is actually about communication, not process.",
+    "There's an open question about what success even looks like here.",
+    "We need to be careful not to optimise for the wrong metric.",
+    "What would it look like if we started from the user's perspective?",
+    "I think there are actually two separate problems we're conflating.",
+  ];
+  let demoIdx = 0;
+
+  // ── WebSocket ──────────────────────────────────────────
+  function connectWs() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const base  = location.pathname.replace(/\/[^/]*$/, '');
+    const url   = `${proto}//${location.host}${base}/ws?role=pod&table=${encodeURIComponent(tableId)}&topic=${encodeURIComponent(topic)}`;
+    ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+
+    ws.addEventListener('open', () => {
+      document.getElementById('status-dot').className = 'status-dot connected';
+    });
+
+    ws.addEventListener('message', (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.type === 'canvas_state') renderBoard(msg.board);
+        else if (msg.type === 'tick') showTick(msg.text);
+      } catch {}
+    });
+
+    ws.addEventListener('close', () => {
+      document.getElementById('status-dot').className = 'status-dot';
+      setTimeout(connectWs, 2000);
+    });
+  }
+
+  // ── Recording ──────────────────────────────────────────
+  function startSegment() {
+    if (!stream || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (mediaRecorder) {
+      try { mediaRecorder.stop(); } catch {}
+    }
+    mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'audio/webm;codecs=opus',
+      audioBitsPerSecond: 64000,
+    });
+    mediaRecorder.addEventListener('dataavailable', (e) => {
+      if (e.data && e.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(e.data);
+      }
+    });
+    mediaRecorder.start(250);
+    document.getElementById('status-dot').className = 'status-dot recording';
+  }
+
+  function startRecordingCycle() {
+    startSegment();
+    recorderTimer = setInterval(() => { startSegment(); }, 25000);
+  }
+
+  // ── Demo mode ──────────────────────────────────────────
+  function startDemo() {
+    demoTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const text = DEMO_LINES[demoIdx % DEMO_LINES.length];
+        demoIdx++;
+        ws.send(JSON.stringify({ type: 'demo_transcript', text }));
+        showTick(text);
+      }
+    }, 5000);
+  }
+
+  // ── Start button ───────────────────────────────────────
+  document.getElementById('start-btn').addEventListener('click', async () => {
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('board').classList.add('active');
+    document.getElementById('board-title').textContent =
+      topic ? `${topic} — Table ${tableId}` : `Table ${tableId}`;
+
+    connectWs();
+
+    if (demo) {
+      startDemo();
+    } else {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+        });
+        // Wait for WS to open
+        const waitOpen = () => new Promise((res) => {
+          if (ws.readyState === WebSocket.OPEN) { res(); return; }
+          ws.addEventListener('open', res, { once: true });
+        });
+        await waitOpen();
+        startRecordingCycle();
+      } catch (err) {
+        alert('Microphone access denied: ' + err.message);
+      }
+    }
+  });
+
+  // ── Render board ───────────────────────────────────────
+  function renderBoard(board) {
+    // Synthesis
+    const synEl = document.getElementById('synthesis-card');
+    if (board.synthesis) {
+      document.getElementById('synthesis-text').textContent = board.synthesis;
+      synEl.classList.add('visible');
+    } else {
+      synEl.classList.remove('visible');
+    }
+
+    // Clusters
+    const grid = document.getElementById('cluster-grid');
+    const existingCards = {};
+    for (const el of grid.querySelectorAll('.cluster-card')) {
+      existingCards[el.dataset.id] = el;
+    }
+
+    for (const cluster of board.clusters) {
+      const clusterIdeas = board.ideas.filter(i => i.clusterId === cluster.id);
+      let card = existingCards[cluster.id];
+
+      if (!card) {
+        card = document.createElement('div');
+        card.className = 'cluster-card' + (cluster.emphasized ? ' emphasized' : '');
+        card.dataset.id = cluster.id;
+        card.innerHTML = `
+          <div class="cluster-label">${escHtml(cluster.label)}</div>
+          <ul class="idea-list"></ul>`;
+        grid.appendChild(card);
+        delete existingCards[cluster.id];
+      } else {
+        if (cluster.emphasized) card.classList.add('emphasized');
+        delete existingCards[cluster.id];
+      }
+
+      // Sync ideas
+      const ul = card.querySelector('.idea-list');
+      const existingItems = {};
+      for (const li of ul.querySelectorAll('.idea-item')) {
+        existingItems[li.dataset.id] = li;
+      }
+      for (const idea of clusterIdeas) {
+        if (!existingItems[idea.id]) {
+          const li = document.createElement('li');
+          li.className = 'idea-item new-idea';
+          li.dataset.id = idea.id;
+          li.textContent = idea.text;
+          ul.appendChild(li);
+          setTimeout(() => li.classList.remove('new-idea'), 600);
+        }
+      }
+    }
+
+    // Quotes
+    const quotesSection = document.getElementById('quotes-section');
+    quotesSection.innerHTML = '';
+    for (const q of board.quotes) {
+      const div = document.createElement('div');
+      div.className = 'quote-card';
+      const t = new Date(q.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      div.innerHTML = `
+        <div class="quote-text">"${escHtml(q.text)}"</div>
+        <div class="quote-time">${t}</div>`;
+      quotesSection.appendChild(div);
+    }
+
+    // Flags
+    const rail = document.getElementById('flags-rail');
+    rail.innerHTML = '';
+    for (const f of board.flags) {
+      const pill = document.createElement('div');
+      pill.className = 'flag-pill';
+      pill.innerHTML = `<span class="kind-badge">${escHtml(f.kind.replace('_',' '))}</span>${escHtml(f.text)}`;
+      rail.appendChild(pill);
+    }
+  }
+
+  function showTick(text) {
+    const el = document.getElementById('ticker-text');
+    el.style.opacity = '0';
+    setTimeout(() => {
+      el.textContent = text;
+      el.style.opacity = '0.9';
+    }, 200);
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+</script>
+</body>
+</html>

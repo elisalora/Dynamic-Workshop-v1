@@ -1,0 +1,22 @@
+Build a Node.js (Express + ws, ES modules, no database, no React — plain HTML/JS pages) app called "scribe-pilot" for live workshop facilitation. One server, three pages, all state in memory.
+
+CONCEPT: Several discussion tables run in parallel. Each table has a laptop showing pod.html, which captures mic audio and displays an AI-generated "visual scribe board" of the conversation. A facilitator watches console.html. When the AI finds a theme emerging across multiple tables, the facilitator can reveal it as a new discussion topic on board.html, a split-flap display simulation.
+
+PAGES
+1. /pod.html?table=T1&topic=... — On a start-button click (needed for mic permission): capture mic with getUserMedia (echoCancellation on), MediaRecorder audio/webm;codecs=opus at 250ms timeslices, stream binary chunks over WebSocket to the server. Restart the MediaRecorder every 25s so each segment has webm headers (makes ASR reconnects self-healing). Renders the scribe board: cluster cards (label + short idea lines), rare serif italic quote callouts with timestamps, an "emerging synthesis" card pinned on top, a bottom rail of flag pills (open questions), and a one-line live transcript ticker at the very bottom. Warm paper/ink aesthetic, large type readable from 3 meters. New elements animate in.
+2. /console.html — dark, phone-friendly. Grid of table cards: status chip (flowing/circling/quiet/converging), sparkline of words-per-minute history, one-line AI summary. Below: "Spawn candidates" list from the theme engine, each with topic, rationale, evidence chips (table + quote), and buttons: Reveal on board / Edit + reveal (prompt() for wording) / Dismiss.
+3. /board.html — fullscreen split-flap board, 6 rows × 22 columns, dark tiles. On a reveal message, each tile cycles through the character set to its target with column-staggered timing, a scaleY flip animation, and short synthesized square-wave clicks via Web Audio (no audio files; require one click on the page first to unlock audio). Centered word-wrapped text; seed prompts fade in below after the flip settles.
+
+SERVER
+- WebSocket roles via query param: role=pod&table=ID (binary audio in, canvas ops out), role=console (state snapshots out; reveal/dismiss commands in), role=board (reveal messages out).
+- ASR: bridge each pod's audio to Deepgram live over raw WebSocket: wss://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&interim_results=false&language=en with header "Authorization: Token <DEEPGRAM_API_KEY>". Do NOT set encoding params (webm is auto-detected). Send {"type":"KeepAlive"} every 8s. On final results, append transcript segments to the table's state and echo to the pod ticker. Auto-reconnect on close.
+- Scribe loop, every 45s per table with new speech: call Anthropic API (model claude-sonnet-4-6) with the table's new transcript + current board state. System prompt demands JSON only: {"summary": "...", "ops":[...]} with ops: add_cluster{id,label}, add_idea{cluster,text}, link{from,to,kind:supports|tension}, quote{text}, flag{kind,text}, emphasize{target}, synthesis{text}. The prompt must stress restraint: prefer existing clusters, quotes are rare, empty ops list is valid. Apply ops server-side to canonical state, broadcast applied ops to the pod, summary to console. On pod reconnect, send full canvas state so the board repaints.
+- Metrics loop, every 60s per table: words/min; novelty = share of content words unseen in prior 10 min (stopword-filtered set overlap); status machine: quiet if no speech 3 min, circling if wpm>60 and novelty<0.18, else flowing; converging when a synthesis op lands.
+- Theme loop, every 180s: send all tables' board digests to Claude; JSON response of candidates {topic (<40 chars), rationale, confidence low|medium|high, evidence:[{table,quote}], seed_prompts:[...]}. Require genuine cross-table support; empty list is normal. Merge by topic string; high confidence → "ready" state, sorted to top of console.
+- Reveal command: mark candidate revealed, broadcast {type:"reveal", text, prompts} to all boards.
+- Append every transcript line, op, theme pass, and reveal/dismiss to a JSONL log file.
+
+SECRETS: ANTHROPIC_API_KEY, DEEPGRAM_API_KEY (Replit Secrets).
+Call the Anthropic API directly via fetch to https://api.anthropic.com/v1/messages with headers x-api-key and anthropic-version: 2023-06-01.
+
+TEST: add a "demo mode" query flag on pod.html (?demo=1) that skips the mic and feeds a scripted fake transcript line every 5s, so the full pipeline can be demonstrated without speaking.
