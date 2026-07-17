@@ -89,9 +89,20 @@ export interface SessionConfig {
   createdAt: number;
 }
 
+export interface Workshop {
+  id: string;
+  name: string;
+  tableIds: string[]; // ordered list of assigned table IDs
+  createdAt: number;
+  summary?: string;
+  summaryGeneratedAt?: number;
+}
+
 export const tables = new Map<string, TableState>();
+export const archivedTables = new Map<string, TableState>();
 export const themeCandidates = new Map<string, ThemeCandidate>();
 export const sessionConfigs = new Map<string, SessionConfig>();
+export const workshops = new Map<string, Workshop>();
 
 export function createSession(name: string, questions: string[]): SessionConfig {
   // Short readable token: 6 uppercase alphanumeric chars
@@ -99,6 +110,39 @@ export function createSession(name: string, questions: string[]): SessionConfig 
   const config: SessionConfig = { tableId: token, name, questions, createdAt: Date.now() };
   sessionConfigs.set(token, config);
   return config;
+}
+
+export function createWorkshop(name: string): Workshop {
+  const id = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const w: Workshop = { id, name, tableIds: [], createdAt: Date.now() };
+  workshops.set(id, w);
+  return w;
+}
+
+/** Move a table from active to archived. Closes its pod socket (which triggers Deepgram cleanup). */
+export function archiveTable(tableId: string): void {
+  const table = tables.get(tableId);
+  if (!table) return;
+  tables.delete(tableId);
+  archivedTables.set(tableId, table);
+  // Remove from all workshops
+  for (const w of workshops.values()) {
+    const idx = w.tableIds.indexOf(tableId);
+    if (idx !== -1) w.tableIds.splice(idx, 1);
+  }
+  // Close the pod socket — ws-handler's close handler will call disconnectDeepgram
+  const ws = podSockets.get(tableId);
+  if (ws) {
+    try { ws.close(1000, "archived"); } catch { /* ignore */ }
+  }
+}
+
+/** Restore an archived table back to active. */
+export function unarchiveTable(tableId: string): void {
+  const table = archivedTables.get(tableId);
+  if (!table) return;
+  archivedTables.delete(tableId);
+  tables.set(tableId, table);
 }
 
 // WebSocket client registry
@@ -160,6 +204,11 @@ export function sendToPod(tableId: string, msg: unknown): void {
 export function consoleSnapshot() {
   const tableArr = Array.from(tables.values()).map((t) => {
     const cfg = sessionConfigs.get(t.id);
+    // Find which workshop this table belongs to
+    let workshopId: string | null = null;
+    for (const w of workshops.values()) {
+      if (w.tableIds.includes(t.id)) { workshopId = w.id; break; }
+    }
     return {
       id: t.id,
       topic: t.topic,
@@ -168,6 +217,7 @@ export function consoleSnapshot() {
       summary: t.summary,
       metrics: t.metrics,
       board: t.board,
+      workshopId,
     };
   });
 
@@ -185,5 +235,33 @@ export function consoleSnapshot() {
     const order = { ready: 0, pending: 1, revealed: 2, dismissed: 3 };
     return (order[a.state] ?? 9) - (order[b.state] ?? 9);
   });
-  return { type: "state", tables: tableArr, waitingSessions: waitingArr, candidates: candidateArr };
+
+  const workshopArr = Array.from(workshops.values()).map((w) => ({
+    id: w.id,
+    name: w.name,
+    tableIds: w.tableIds,
+    createdAt: w.createdAt,
+    summary: w.summary ?? null,
+    summaryGeneratedAt: w.summaryGeneratedAt ?? null,
+  }));
+
+  const archivedArr = Array.from(archivedTables.values()).map((t) => {
+    const cfg = sessionConfigs.get(t.id);
+    return {
+      id: t.id,
+      topic: t.topic,
+      name: cfg?.name ?? t.topic ?? t.id,
+      summary: t.summary,
+      board: t.board,
+    };
+  });
+
+  return {
+    type: "state",
+    tables: tableArr,
+    waitingSessions: waitingArr,
+    candidates: candidateArr,
+    workshops: workshopArr,
+    archivedTables: archivedArr,
+  };
 }
