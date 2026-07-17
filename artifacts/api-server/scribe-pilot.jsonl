@@ -900,3 +900,4 @@
 {"kind":"scribe","table":"T1","summary":"Participant raises fundamental concern about defining success criteria for the initiative.","opCount":2,"ts":1784324559096}
 {"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784324579291}
 {"kind":"scribe","table":"T1","summary":"Reiteration of concern about optimizing for wrong metrics, already captured on board.","opCount":0,"ts":1784324602786}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784324639307}
