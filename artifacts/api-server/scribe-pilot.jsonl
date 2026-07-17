@@ -648,3 +648,92 @@
 {"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784322229292}
 {"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784322234294}
 {"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784322239354}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784322269297}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784322274298}
+{"kind":"op","table":"T1","op":{"op":"add_cluster","id":"architecture-approaches","label":"Architecture Approaches"},"ts":1784322291607}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"architecture-approaches","text":"Centralised approach"},"ts":1784322291608}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"architecture-approaches","text":"Distributed approach"},"ts":1784322291608}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"open_question","text":"How might we test this assumption without building the whole thing?"},"ts":1784322291608}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"assumption","text":"Need to choose between centralised or distributed"},"ts":1784322291608}
+{"kind":"op","table":"T1","op":{"op":"add_cluster","id":"validation-strategy","label":"Validation Strategy"},"ts":1784322291608}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"validation-strategy","text":"Test assumptions incrementally"},"ts":1784322291608}
+{"kind":"scribe","table":"T1","summary":"Exploring tension between centralised vs distributed approaches and suggesting testing assumptions incrementally.","opCount":7,"ts":1784322291608}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784322322350}
+{"kind":"op","table":"T1","op":{"op":"add_cluster","id":"root-cause","label":"Root Cause Hypothesis"},"ts":1784322335282}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"root-cause","text":"Communication, not process"},"ts":1784322335282}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"assumption","text":"The problem is process-related"},"ts":1784322335283}
+{"kind":"scribe","table":"T1","summary":"Participant suggests the core issue may be communication rather than process.","opCount":3,"ts":1784322335283}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784322346554}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784322348783}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784322353768}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784322360368}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784322366297}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784322371296}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784322376305}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784322381298}
+{"kind":"op","table":"T1","op":{"op":"add_cluster","id":"success-metrics","label":"Success Metrics"},"ts":1784322383268}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"success-metrics","text":"Start from user's perspective"},"ts":1784322383269}
+{"kind":"op","table":"T1","op":{"op":"add_cluster","id":"user-experience","label":"User Experience Focus"},"ts":1784322383269}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Prioritise UX before scaling"},"ts":1784322383269}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Build feedback loop into process"},"ts":1784322383269}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Users drop off at onboarding step"},"ts":1784322383269}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"open_question","text":"What does success even look like here?"},"ts":1784322383269}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"assumption","text":"We might be optimising for the wrong metric"},"ts":1784322383269}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"tension","text":"Moving fast vs maintaining quality standards"},"ts":1784322383270}
+{"kind":"op","table":"T1","op":{"op":"link","from":"user-experience","to":"validation-strategy","kind":"supports"},"ts":1784322383270}
+{"kind":"scribe","table":"T1","summary":"Discussion shifts to defining success metrics and user experience, highlighting tension between speed and quality, with data pointing to onboarding as key drop-off point.","opCount":10,"ts":1784322383271}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784322386296}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784322391297}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784322396304}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784322401361}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784322406297}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784322411317}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784322416294}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784322421295}
+{"kind":"theme_pass","candidateCount":0,"ts":1784322423406}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784322426302}
+{"kind":"op","table":"T1","op":{"op":"add_cluster","id":"ownership-governance","label":"Ownership & Governance"},"ts":1784322427392}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"ownership-governance","text":"Who decides? (recurring question)"},"ts":1784322427393}
+{"kind":"op","table":"T1","op":{"op":"link","from":"ownership-governance","to":"architecture-approaches","kind":"tension"},"ts":1784322427393}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"assumption","text":"There are actually two separate problems being conflated"},"ts":1784322427393}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784322427393}
+{"kind":"op","table":"T1","op":{"op":"synthesis","text":"The group is questioning foundational assumptions about ownership and problem definition, with growing consensus to ground decisions in user perspective rather than internal processes."},"ts":1784322427393}
+{"kind":"scribe","table":"T1","summary":"Discussion reveals fundamental tensions around ownership, raises concerns about conflating separate problems, and questions whether the team is optimising for the right success metrics.","opCount":6,"ts":1784322427393}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784322431298}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784322436296}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784322442326}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Build feedback loop into process"},"ts":1784322471353}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Users drop off at onboarding step"},"ts":1784322471354}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"tension","text":"Moving fast vs maintaining quality standards"},"ts":1784322471354}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"open_question","text":"Who decides ownership?"},"ts":1784322471354}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784322471354}
+{"kind":"scribe","table":"T1","summary":"Discussion surfaced tension between speed and quality, proposing feedback loops, while data reveals onboarding as critical drop-off point and ownership questions persist.","opCount":5,"ts":1784322471354}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784322473824}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784322475375}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784322480374}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784322486298}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784322491304}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784322496299}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784322501295}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784322506300}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784322511292}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784322516318}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784322521294}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"root-cause","text":"Two separate problems being conflated"},"ts":1784322522736}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784322522736}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"assumption","text":"We might be optimising for the wrong metric"},"ts":1784322522736}
+{"kind":"op","table":"T1","op":{"op":"synthesis","text":"The group is questioning foundational assumptions and identifying potentially conflated problems, with strong consensus to ground all decisions in user perspective before addressing process or scale."},"ts":1784322522736}
+{"kind":"scribe","table":"T1","summary":"The group identifies potentially conflated problems, emphasizes starting from user perspective, and surfaces the tension between speed and quality.","opCount":4,"ts":1784322522736}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784322526294}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784322531375}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784322536295}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784322541346}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Build feedback loop into process"},"ts":1784322560966}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Users drop off at onboarding step"},"ts":1784322560967}
+{"kind":"op","table":"T1","op":{"op":"link","from":"architecture-approaches","to":"ownership-governance","kind":"tension"},"ts":1784322560967}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"open_question","text":"How might we test this assumption without building the whole thing?"},"ts":1784322560967}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"assumption","text":"The problem is process-related"},"ts":1784322560967}
+{"kind":"scribe","table":"T1","summary":"Exploring feedback loops and testing methods while surfacing tension between centralized/distributed ownership models and questioning whether communication is the real problem.","opCount":5,"ts":1784322560967}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784322562317}
+{"kind":"scribe","table":"T1","summary":"The group continues to surface fundamental uncertainty about defining success.","opCount":0,"ts":1784322603805}
+{"kind":"theme_pass","candidateCount":0,"ts":1784322612321}
