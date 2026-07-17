@@ -6,6 +6,7 @@ import {
   broadcastConsole,
   consoleSnapshot,
 } from "../state.js";
+import { persistSession, deleteSession, persistWorkshop } from "../persist.js";
 import { generateSessionSummary } from "../summary.js";
 import { logger } from "../lib/logger.js";
 
@@ -29,6 +30,7 @@ router.patch("/sessions/:id", (req, res) => {
   if (!s) { res.status(404).json({ error: "not found" }); return; }
   const { name } = req.body as { name?: string };
   if (name?.trim()) s.name = name.trim();
+  persistSession(s);
   broadcastConsole(consoleSnapshot());
   res.json(s);
 });
@@ -39,12 +41,14 @@ router.delete("/sessions/:id", (req, res) => {
   const s = sessions.get(id);
   if (!s) { res.status(404).json({ error: "not found" }); return; }
   sessions.delete(id);
+  deleteSession(id);
   // Remove from parent workshop's sessionIds list
   if (s.workshopId) {
     const w = workshops.get(s.workshopId);
     if (w) {
       const idx = w.sessionIds.indexOf(id);
       if (idx !== -1) w.sessionIds.splice(idx, 1);
+      persistWorkshop(w);
     }
   }
   broadcastConsole(consoleSnapshot());
@@ -59,9 +63,13 @@ router.post("/sessions/:id/assign/:tableId", (req, res) => {
   // Remove from any other session first
   for (const other of sessions.values()) {
     const idx = other.tableIds.indexOf(tableId);
-    if (idx !== -1) other.tableIds.splice(idx, 1);
+    if (idx !== -1) {
+      other.tableIds.splice(idx, 1);
+      persistSession(other);
+    }
   }
   if (!s.tableIds.includes(tableId)) s.tableIds.push(tableId);
+  persistSession(s);
   broadcastConsole(consoleSnapshot());
   res.json({ ok: true });
 });
@@ -72,6 +80,7 @@ router.post("/sessions/:id/unassign/:tableId", (req, res) => {
   if (!s) { res.status(404).json({ error: "not found" }); return; }
   const idx = s.tableIds.indexOf(req.params["tableId"]!);
   if (idx !== -1) s.tableIds.splice(idx, 1);
+  persistSession(s);
   broadcastConsole(consoleSnapshot());
   res.json({ ok: true });
 });

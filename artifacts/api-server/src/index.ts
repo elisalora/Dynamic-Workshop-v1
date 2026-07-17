@@ -5,6 +5,7 @@ import { createWss, handleUpgrade } from "./ws-handler.js";
 import { startScribeLoops } from "./scribe.js";
 import { startMetricsLoop } from "./metrics.js";
 import { startThemeLoop } from "./themes.js";
+import { ensureSchema, hydrateFromDb } from "./persist.js";
 
 const rawPort = process.env["PORT"];
 
@@ -24,12 +25,21 @@ server.on("upgrade", (req, socket, head) => {
   handleUpgrade(wss, req, socket as import("node:stream").Duplex, head);
 });
 
-server.listen(port, () => {
-  logger.info({ port }, "Scribe Pilot server listening");
-  startScribeLoops();
-  startMetricsLoop();
-  startThemeLoop();
-});
+// Ensure tables exist, then hydrate in-memory state before accepting connections
+ensureSchema()
+  .then(() => hydrateFromDb())
+  .then(() => {
+    server.listen(port, () => {
+      logger.info({ port }, "Scribe Pilot server listening");
+      startScribeLoops();
+      startMetricsLoop();
+      startThemeLoop();
+    });
+  })
+  .catch((err) => {
+    logger.error({ err }, "Failed to hydrate state from database — aborting startup");
+    process.exit(1);
+  });
 
 server.on("error", (err) => {
   logger.error({ err }, "Server error");

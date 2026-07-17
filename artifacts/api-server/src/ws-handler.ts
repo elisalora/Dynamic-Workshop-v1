@@ -15,6 +15,7 @@ import {
   consoleSnapshot,
 } from "./state.js";
 import { connectDeepgram, sendAudioToDg, disconnectDeepgram } from "./deepgram.js";
+import { persistActiveTable } from "./persist.js";
 import { jsonlLog } from "./jsonl-log.js";
 import { logger } from "./lib/logger.js";
 
@@ -107,6 +108,8 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
           t.transcript.push({ table: tableId, text, timestamp: Date.now() });
           t.hasNewSpeech = true;
           jsonlLog({ kind: "demo_transcript", table: tableId, text });
+          // Persist transcript immediately so it survives a restart before the next scribe run
+          persistActiveTable(t);
           sendToPod(tableId, { type: "tick", text });
         }
       } catch {

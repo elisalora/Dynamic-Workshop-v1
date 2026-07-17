@@ -1,4 +1,5 @@
 import { tables, broadcastConsole, consoleSnapshot } from "./state.js";
+import { persistActiveTable } from "./persist.js";
 import { logger } from "./lib/logger.js";
 
 const METRICS_INTERVAL_MS = 60_000;
@@ -119,6 +120,9 @@ export function startMetricsLoop(): void {
     for (const tableId of tables.keys()) {
       try {
         runMetricsForTable(tableId);
+        // Checkpoint metrics to DB so status/WPM survive a restart
+        const table = tables.get(tableId);
+        if (table) persistActiveTable(table);
       } catch (err) {
         logger.error({ err, tableId }, "Metrics error");
       }

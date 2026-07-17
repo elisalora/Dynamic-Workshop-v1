@@ -121,11 +121,20 @@ export const sessionConfigs = new Map<string, SessionConfig>();
 export const sessions = new Map<string, Session>();
 export const workshops = new Map<string, Workshop>();
 
+// Lazy import to avoid circular deps — persist.ts imports from state.ts
+type PersistModule = typeof import("./persist.js");
+let _persist: PersistModule | null = null;
+async function getPersist(): Promise<PersistModule> {
+  if (!_persist) _persist = await import("./persist.js");
+  return _persist;
+}
+
 /** Create a pod group config (name + questions for a discussion table). */
 export function createGroup(name: string, questions: string[]): SessionConfig {
   const token = Math.random().toString(36).slice(2, 8).toUpperCase();
   const config: SessionConfig = { tableId: token, name, questions, createdAt: Date.now() };
   sessionConfigs.set(token, config);
+  getPersist().then((p) => p.persistSessionConfig(config)).catch(() => {});
   return config;
 }
 
@@ -136,8 +145,12 @@ export function createSession(name: string, workshopId?: string): Session {
   sessions.set(id, s);
   if (workshopId) {
     const w = workshops.get(workshopId);
-    if (w && !w.sessionIds.includes(id)) w.sessionIds.push(id);
+    if (w && !w.sessionIds.includes(id)) {
+      w.sessionIds.push(id);
+      getPersist().then((p) => p.persistWorkshop(w)).catch(() => {});
+    }
   }
+  getPersist().then((p) => p.persistSession(s)).catch(() => {});
   return s;
 }
 
@@ -146,6 +159,7 @@ export function createWorkshop(name: string): Workshop {
   const id = Math.random().toString(36).slice(2, 8).toUpperCase();
   const w: Workshop = { id, name, sessionIds: [], createdAt: Date.now() };
   workshops.set(id, w);
+  getPersist().then((p) => p.persistWorkshop(w)).catch(() => {});
   return w;
 }
 
@@ -155,11 +169,19 @@ export function archiveTable(tableId: string): void {
   if (!table) return;
   tables.delete(tableId);
   archivedTables.set(tableId, table);
-  // Remove from all sessions
+  // Remove from all sessions and persist each affected session
   for (const s of sessions.values()) {
     const idx = s.tableIds.indexOf(tableId);
-    if (idx !== -1) s.tableIds.splice(idx, 1);
+    if (idx !== -1) {
+      s.tableIds.splice(idx, 1);
+      getPersist().then((p) => p.persistSession(s)).catch(() => {});
+    }
   }
+  // Move in DB: delete from active, upsert to archived
+  getPersist().then((p) => {
+    p.deleteActiveTable(tableId);
+    p.persistArchivedTable(table);
+  }).catch(() => {});
   // Close the pod socket — ws-handler's close handler will call disconnectDeepgram
   const ws = podSockets.get(tableId);
   if (ws) {
@@ -173,6 +195,10 @@ export function unarchiveTable(tableId: string): void {
   if (!table) return;
   archivedTables.delete(tableId);
   tables.set(tableId, table);
+  getPersist().then((p) => {
+    p.deleteArchivedTable(tableId);
+    p.persistActiveTable(table);
+  }).catch(() => {});
 }
 
 // WebSocket client registry
@@ -182,7 +208,7 @@ export const boardSockets = new Set<WebSocket>();
 
 export function getOrCreateTable(id: string, topic = ""): TableState {
   if (!tables.has(id)) {
-    tables.set(id, {
+    const t: TableState = {
       id,
       topic,
       transcript: [],
@@ -207,7 +233,9 @@ export function getOrCreateTable(id: string, topic = ""): TableState {
       hasNewSpeech: false,
       wordBuckets: new Map(),
       allWordsSeen: new Set(),
-    });
+    };
+    tables.set(id, t);
+    getPersist().then((p) => p.persistActiveTable(t)).catch(() => {});
   }
   return tables.get(id)!;
 }

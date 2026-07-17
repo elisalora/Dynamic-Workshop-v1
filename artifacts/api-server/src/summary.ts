@@ -7,6 +7,7 @@ import {
   consoleSnapshot,
   type TableState,
 } from "./state.js";
+import { persistSession } from "./persist.js";
 import { logger } from "./lib/logger.js";
 
 export async function generateSessionSummary(sessionId: string): Promise<string> {
@@ -76,6 +77,7 @@ Write a structured report with exactly these sections (use ## headings):
 
   session.summary = cleaned;
   session.summaryGeneratedAt = Date.now();
+  persistSession(session);
   broadcastConsole(consoleSnapshot());
 
   logger.info({ sessionId }, "Session summary complete");

@@ -10,6 +10,7 @@ import {
   type Quote,
   type Flag,
 } from "./state.js";
+import { persistActiveTable } from "./persist.js";
 import { jsonlLog } from "./jsonl-log.js";
 import { logger } from "./lib/logger.js";
 
@@ -137,6 +138,9 @@ async function runScribeForTable(tableId: string): Promise<void> {
     applyOps(tableId, ops);
 
     jsonlLog({ kind: "scribe", table: tableId, summary: table.summary, opCount: ops.length });
+
+    // Checkpoint board + transcript to DB after every successful scribe run
+    persistActiveTable(table);
 
     // Send ops + full board to pod
     sendToPod(tableId, { type: "canvas_state", board: table.board, summary: table.summary });
