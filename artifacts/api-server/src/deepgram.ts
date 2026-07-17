@@ -7,7 +7,7 @@ import { logger } from "./lib/logger.js";
 
 const DG_URL =
   "wss://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&interim_results=false&language=en";
-const KEEPALIVE_INTERVAL_MS = 8_000;
+const KEEPALIVE_INTERVAL_MS = 5_000;
 const RECONNECT_DELAY_MS = 2_000;
 
 interface DGWord {

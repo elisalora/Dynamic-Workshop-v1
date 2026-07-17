@@ -71,9 +71,6 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
   const table = getOrCreateTable(tableId, resolvedTopic);
   podSockets.set(tableId, ws);
 
-  // Connect Deepgram ASR
-  connectDeepgram(tableId);
-
   // Send full canvas state + session questions on (re)connect
   ws.send(JSON.stringify({
     type: "canvas_state",
@@ -86,9 +83,18 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
   // Broadcast updated console
   broadcastConsole(consoleSnapshot());
 
+  // Connect Deepgram lazily — only when the first audio chunk arrives.
+  // This avoids a rapid connect/close loop when the pod is on the start
+  // screen (WS open but mic not yet recording).
+  let dgStarted = false;
+
   ws.on("message", (data, isBinary) => {
     if (isBinary) {
-      // Binary audio chunk — forward to Deepgram
+      // Binary audio chunk — connect Deepgram on first chunk, then forward.
+      if (!dgStarted) {
+        dgStarted = true;
+        connectDeepgram(tableId);
+      }
       sendAudioToDg(tableId, data as Buffer);
     } else {
       // Text message (demo mode transcript injection)
