@@ -7,15 +7,25 @@ import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs } from 'expo-router';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { SymbolView } from 'expo-symbols';
+import { useConsole } from '@/context/ConsoleContext';
+
+function useThemesBadge(): number {
+  const { state } = useConsole();
+  return state.candidates.filter(
+    (c) => c.state === 'pending' || c.state === 'ready',
+  ).length;
+}
 
 function NativeTabLayout() {
+  const badge = useThemesBadge();
+
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: 'rectangle.3.group', selected: 'rectangle.3.group.fill' }} />
         <Label>Groups</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="themes">
+      <NativeTabs.Trigger name="themes" options={badge > 0 ? { badgeValue: String(badge) } : undefined}>
         <Icon sf={{ default: 'sparkles', selected: 'sparkles' }} />
         <Label>Themes</Label>
       </NativeTabs.Trigger>
@@ -29,6 +39,7 @@ function ClassicTabLayout() {
   const isDark = colorScheme === 'dark';
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
+  const badge = useThemesBadge();
 
   return (
     <Tabs
@@ -85,6 +96,7 @@ function ClassicTabLayout() {
         name="themes"
         options={{
           title: 'Themes',
+          tabBarBadge: badge > 0 ? badge : undefined,
           tabBarIcon: ({ color, size }) =>
             isIOS ? (
               <SymbolView name="sparkles" tintColor={color} size={size} />
