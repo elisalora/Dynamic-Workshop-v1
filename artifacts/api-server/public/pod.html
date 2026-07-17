@@ -280,12 +280,12 @@
   }
   .idea-item {
     font-size: clamp(0.82rem, 1.5vw, 1.25rem);
-    line-height: 1.35;
+    line-height: 1.4;
     padding-left: 1.1em;
     position: relative;
     overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
     animation: ideaSlide 0.35s ease-out;
   }
   .idea-item::before { content: '–'; position: absolute; left: 0; color: var(--accent-light); }
