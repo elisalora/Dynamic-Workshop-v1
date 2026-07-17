@@ -77,27 +77,33 @@
   /* ── Table cards ─────────────────────── */
   #tables-section { margin-bottom: 1.75rem; }
   #tables-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
   }
 
   .table-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 0.85rem 1rem;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s;
   }
-  .table-card-header {
+  .table-card:hover { border-color: var(--accent); }
+  .table-card.expanded { border-color: var(--accent); }
+
+  .table-card-summary {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
   }
   .table-id {
     font-weight: 700;
     font-size: 1rem;
     color: var(--text);
+    flex-shrink: 0;
   }
   .status-chip {
     font-size: 0.65rem;
@@ -108,6 +114,7 @@
     border-radius: 100px;
     background: var(--surface2);
     color: var(--muted);
+    flex-shrink: 0;
   }
   .status-chip.flowing  { background: #dcfce7; color: var(--green); }
   .status-chip.circling { background: #ffedd5; color: var(--orange); }
@@ -115,30 +122,118 @@
   .status-chip.converging { background: #ede9fe; color: var(--purple); }
 
   .sparkline-wrap {
-    height: 32px;
-    margin: 0.4rem 0;
+    height: 28px;
     display: flex;
     align-items: flex-end;
     gap: 2px;
+    flex-shrink: 0;
+    width: 60px;
   }
   .spark-bar {
     flex: 1;
     background: var(--accent);
-    opacity: 0.6;
+    opacity: 0.5;
     border-radius: 2px 2px 0 0;
-    transition: height 0.3s ease;
     min-height: 2px;
   }
 
-  .table-summary {
+  .table-summary-text {
     font-size: 0.8rem;
     color: var(--muted);
     line-height: 1.4;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
     font-style: italic;
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .table-card.expanded .table-summary-text {
+    white-space: normal;
+  }
+
+  .chevron {
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+  }
+  .table-card.expanded .chevron { transform: rotate(180deg); }
+
+  /* ── Expanded detail panel ───────────── */
+  .table-detail {
+    display: none;
+    padding: 0 1rem 1rem;
+    border-top: 1px solid var(--border);
+    margin-top: 0;
+    animation: slideDown 0.2s ease-out;
+  }
+  .table-card.expanded .table-detail { display: block; }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .detail-section {
+    margin-top: 0.85rem;
+  }
+  .detail-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+  }
+  .cluster-block {
+    margin-bottom: 0.6rem;
+  }
+  .cluster-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+  }
+  .idea-row {
+    font-size: 0.8rem;
+    color: var(--text);
+    padding-left: 0.9rem;
+    line-height: 1.5;
+    position: relative;
+  }
+  .idea-row::before { content: '–'; position: absolute; left: 0; color: var(--muted); }
+
+  .quote-row {
+    font-size: 0.8rem;
+    color: var(--text);
+    font-style: italic;
+    border-left: 2px solid var(--border);
+    padding-left: 0.6rem;
+    margin-bottom: 0.35rem;
+    line-height: 1.4;
+  }
+
+  .flag-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: var(--surface2);
+    border-radius: 4px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    margin: 0.2rem 0.2rem 0 0;
+  }
+  .flag-kind {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .synthesis-row {
+    font-size: 0.82rem;
+    background: #eff6ff;
+    border-left: 3px solid var(--accent);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0 4px 4px 0;
+    line-height: 1.5;
+    color: var(--text);
   }
 
   /* ── Candidates ──────────────────────── */
@@ -290,6 +385,8 @@
   }
 
   // ── Tables ──────────────────────────────────────────────
+  const expandedIds = new Set();
+
   function renderState(state) {
     renderTables(state.tables || []);
     renderCandidates(state.candidates || []);
@@ -307,10 +404,16 @@
 
     for (const t of tables) {
       let card = existing[t.id];
-      if (!card) {
+      const isNew = !card;
+      if (isNew) {
         card = document.createElement('div');
-        card.className = 'table-card';
         card.dataset.id = t.id;
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('[data-action]')) return;
+          if (expandedIds.has(t.id)) expandedIds.delete(t.id);
+          else expandedIds.add(t.id);
+          card.classList.toggle('expanded', expandedIds.has(t.id));
+        });
         grid.appendChild(card);
       }
       delete existing[t.id];
@@ -319,20 +422,57 @@
       const status = m.status || 'quiet';
       const wpmHistory = m.wpmHistory || [];
       const maxWpm = Math.max(...wpmHistory, 1);
+      const board = t.board || { clusters: [], ideas: [], quotes: [], flags: [], synthesis: null };
+      const isExpanded = expandedIds.has(t.id);
+
+      card.className = 'table-card' + (isExpanded ? ' expanded' : '');
+
+      // Build cluster detail HTML
+      const clusterHtml = board.clusters.length
+        ? board.clusters.map(c => {
+            const ideas = (board.ideas || []).filter(i => i.clusterId === c.id);
+            return `<div class="cluster-block">
+              <div class="cluster-name">${esc(c.label)}</div>
+              ${ideas.map(i => `<div class="idea-row">${esc(i.text)}</div>`).join('')}
+            </div>`;
+          }).join('')
+        : '<span style="color:var(--muted);font-size:0.8rem;font-style:italic;">No clusters yet</span>';
+
+      const quotesHtml = (board.quotes || []).length
+        ? board.quotes.map(q => `<div class="quote-row">"${esc(q.text)}"</div>`).join('')
+        : '';
+
+      const flagsHtml = (board.flags || []).length
+        ? board.flags.map(f => `<span class="flag-row"><span class="flag-kind">${esc(f.kind.replace(/_/g,' '))}</span>${esc(f.text)}</span>`).join('')
+        : '';
+
+      const synthesisHtml = board.synthesis
+        ? `<div class="detail-section"><div class="detail-label">Synthesis</div><div class="synthesis-row">${esc(board.synthesis)}</div></div>`
+        : '';
 
       card.innerHTML = `
-        <div class="table-card-header">
+        <div class="table-card-summary">
           <div class="table-id">Table ${esc(t.id)}</div>
           <div class="status-chip ${status}">${status}</div>
+          <div class="sparkline-wrap">${
+            Array.from({length: 10}, (_, i) => {
+              const v = wpmHistory[wpmHistory.length - 10 + i] ?? 0;
+              const h = Math.round((v / maxWpm) * 24) + 2;
+              return `<div class="spark-bar" style="height:${h}px"></div>`;
+            }).join('')
+          }</div>
+          <div class="table-summary-text">${esc(t.summary || '(no summary yet)')}</div>
+          <div class="chevron">▾</div>
         </div>
-        <div class="sparkline-wrap">${
-          Array.from({length: 10}, (_, i) => {
-            const v = wpmHistory[wpmHistory.length - 10 + i] ?? 0;
-            const h = Math.round((v / maxWpm) * 28) + 2;
-            return `<div class="spark-bar" style="height:${h}px"></div>`;
-          }).join('')
-        }</div>
-        <div class="table-summary">${esc(t.summary || '(no summary yet)')}</div>`;
+        <div class="table-detail">
+          ${synthesisHtml}
+          <div class="detail-section">
+            <div class="detail-label">Clusters &amp; Ideas</div>
+            ${clusterHtml}
+          </div>
+          ${quotesHtml ? `<div class="detail-section"><div class="detail-label">Quotes</div>${quotesHtml}</div>` : ''}
+          ${flagsHtml ? `<div class="detail-section"><div class="detail-label">Open Questions &amp; Flags</div>${flagsHtml}</div>` : ''}
+        </div>`;
     }
 
     // Remove stale cards
