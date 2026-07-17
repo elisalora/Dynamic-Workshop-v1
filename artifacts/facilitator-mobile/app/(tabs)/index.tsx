@@ -5,11 +5,13 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useConsole } from '@/context/ConsoleContext';
@@ -275,6 +277,14 @@ function WaitingCard({ session }: { session: import('@/context/ConsoleContext').
   const colors = useColors();
   const { deleteTable } = useConsole();
 
+  const handleShare = async () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const url = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${session.tableId}`;
+    try {
+      await Share.share({ url, message: url });
+    } catch (_) {}
+  };
+
   return (
     <View style={[styles.waitingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.waitingHeader}>
@@ -309,8 +319,16 @@ function WaitingCard({ session }: { session: import('@/context/ConsoleContext').
       <View style={[styles.linkRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <Ionicons name="link-outline" size={12} color={colors.mutedForeground} />
         <Text style={[styles.linkText, { color: colors.mutedForeground }]} numberOfLines={1}>
-          Pod link ready — share table ID: {session.tableId}
+          Pod link ready — tap to share
         </Text>
+        <Pressable
+          onPress={handleShare}
+          hitSlop={4}
+          style={[styles.shareBtn, { backgroundColor: colors.primary }]}
+        >
+          <Ionicons name="share-outline" size={13} color={colors.primaryForeground} />
+          <Text style={[styles.shareBtnText, { color: colors.primaryForeground }]}>Share</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -537,5 +555,17 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  shareBtnText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
   },
 });

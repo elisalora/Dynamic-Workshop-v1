@@ -5,6 +5,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -152,6 +153,14 @@ export function TableCard({ table, workshops }: Props) {
   const metrics = table.metrics ?? { wpmHistory: [], currentWpm: 0, novelty: 0, status: 'quiet', lastSpeechAt: 0 };
   const currentWs = workshops.find((w) => w.tableIds.includes(table.id));
 
+  const handleShare = async () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const url = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${table.id}`;
+    try {
+      await Share.share({ url, message: url });
+    } catch (_) {}
+  };
+
   return (
     <View style={styles.swipeContainer}>
       {/* Archive button underneath */}
@@ -277,6 +286,14 @@ export function TableCard({ table, workshops }: Props) {
                     <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>
                       {currentWs ? currentWs.name : 'Assign Workshop'}
                     </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleShare}
+                    style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
+                  >
+                    <Ionicons name="share-outline" size={14} color={colors.mutedForeground} />
+                    <Text style={[styles.actionBtnText, { color: colors.mutedForeground }]}>Share Pod</Text>
                   </Pressable>
 
                   <Pressable
