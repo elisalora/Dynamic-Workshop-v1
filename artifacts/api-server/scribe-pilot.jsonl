@@ -156,3 +156,58 @@
 {"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784318840671}
 {"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784318845761}
 {"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784318851282}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Test assumptions without building the whole thing"},"ts":1784318855995}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"tensions","text":"Communication vs process as root cause"},"ts":1784318855996}
+{"kind":"op","table":"T1","op":{"op":"flag","kind":"open_question","text":"What does success even look like here?"},"ts":1784318855996}
+{"kind":"scribe","table":"T1","summary":"Team is probing whether to test assumptions incrementally, questioning if the root issue is communication vs process, and seeking clarity on success metrics before scaling.","opCount":3,"ts":1784318855996}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784318856288}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784318861285}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784318866287}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784318871280}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784318876283}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784318881282}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784318886277}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784318891290}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784318896278}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784318901332}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"data-insights","text":"Onboarding step is primary drop-off point"},"ts":1784318904060}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"tensions","text":"Two separate problems being conflated"},"ts":1784318904060}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Question whether problem is communication vs process"},"ts":1784318904060}
+{"kind":"op","table":"T1","op":{"op":"quote","text":"I think there are actually two separate problems we're conflating."},"ts":1784318904060}
+{"kind":"op","table":"T1","op":{"op":"quote","text":"I wonder if the problem is actually about communication, not process."},"ts":1784318904060}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784318904060}
+{"kind":"scribe","table":"T1","summary":"Team identifies that onboarding drop-off data reveals potential conflation of two separate problems, questioning whether the issue is communication versus process while emphasizing need to test assumptions from user perspective.","opCount":6,"ts":1784318904060}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784318906282}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784318911307}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784318916284}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784318921279}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784318926279}
+{"kind":"scribe","table":"T1","summary":"The team continues exploring the tension between moving fast and maintaining quality, while reinforcing the need to prioritize user experience and build feedback mechanisms before scaling.","opCount":0,"ts":1784318945207}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784318962321}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784318970553}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784318975669}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784318981284}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784318985741}
+{"kind":"op","table":"T1","op":{"op":"add_idea","cluster":"user-experience","text":"Test assumptions incrementally without building the whole thing"},"ts":1784318989677}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784318989678}
+{"kind":"scribe","table":"T1","summary":"Team explores testing assumptions incrementally while reframing the core problem from a user-first perspective, questioning success metrics and the communication vs process distinction.","opCount":2,"ts":1784318989678}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784318991276}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784318996284}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784319001277}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784319006249}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784319017277}
+{"kind":"demo_transcript","table":"T1","text":"There's real tension between moving fast and maintaining quality standards.","ts":1784319022275}
+{"kind":"demo_transcript","table":"T1","text":"What if we built a feedback loop into the process itself?","ts":1784319027274}
+{"kind":"demo_transcript","table":"T1","text":"The data suggests most users drop off at the onboarding step.","ts":1784319032277}
+{"kind":"op","table":"T1","op":{"op":"emphasize","target":"user-experience"},"ts":1784319033731}
+{"kind":"scribe","table":"T1","summary":"Repetition emphasizes the core tension between speed and quality, with focus returning to user experience and feedback loops as potential solutions.","opCount":1,"ts":1784319033732}
+{"kind":"demo_transcript","table":"T1","text":"We keep circling back to the question of ownership — who decides?","ts":1784319037303}
+{"kind":"demo_transcript","table":"T1","text":"That's a really interesting tension between centralised and distributed approaches.","ts":1784319042363}
+{"kind":"demo_transcript","table":"T1","text":"How might we test this assumption without building the whole thing?","ts":1784319047274}
+{"kind":"demo_transcript","table":"T1","text":"I wonder if the problem is actually about communication, not process.","ts":1784319052329}
+{"kind":"demo_transcript","table":"T1","text":"There's an open question about what success even looks like here.","ts":1784319057276}
+{"kind":"demo_transcript","table":"T1","text":"We need to be careful not to optimise for the wrong metric.","ts":1784319062282}
+{"kind":"demo_transcript","table":"T1","text":"What would it look like if we started from the user's perspective?","ts":1784319067276}
+{"kind":"demo_transcript","table":"T1","text":"I think there are actually two separate problems we're conflating.","ts":1784319072279}
+{"kind":"scribe","table":"T1","summary":"Team is recognizing they may be conflating two separate problems while questioning their metrics and exploring ways to test assumptions incrementally.","opCount":0,"ts":1784319078938}
+{"kind":"demo_transcript","table":"T1","text":"I think we need to focus on the user experience first before we scale.","ts":1784319082320}
