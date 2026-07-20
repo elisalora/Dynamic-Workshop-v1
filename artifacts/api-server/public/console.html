@@ -4,10 +4,28 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Facilitator Console</title>
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('scribe-theme')||'light')</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* ── Light mode (default) ── */
   :root {
+    --bg: #f8f5f0;
+    --surface: #ffffff;
+    --surface2: #f2ece4;
+    --border: #e0d4c4;
+    --text: #1a1410;
+    --muted: #7a6a58;
+    --accent: #b07010;
+    --accent2: #c44808;
+    --green: #15803d;
+    --orange: #c2520a;
+    --purple: #6d28d9;
+    --red: #b91c1c;
+  }
+
+  /* ── Dark mode ── */
+  html[data-theme="dark"] {
     --bg: #0d0d0b;
     --surface: #181816;
     --surface2: #222220;
@@ -135,6 +153,19 @@
     font-family: inherit;
     transition: background 0.12s, color 0.12s;
   }
+  #theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.1s;
+  }
+  #theme-toggle:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
   .btn-signout:hover { background: rgba(248,113,113,0.1); color: var(--red); border-color: rgba(248,113,113,0.4); }
   #conn-status {
     font-size: 0.75rem;
@@ -918,6 +949,7 @@
 <header>
   <h1>Facilitator Console</h1>
   <div class="header-right">
+    <button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>
     <div id="user-info" style="display:none">
       <span id="user-name"></span>
       <button class="btn-signout" id="btn-signout">Sign out</button>
@@ -1050,6 +1082,22 @@
     </div>
   </div>
 </dialog>
+
+<script>
+// ── Theme toggle ──────────────────────────────────────────
+window._toggleTheme = function() {
+  var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('scribe-theme', next);
+  var btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = next === 'dark' ? '☀ Light' : '☾ Dark';
+};
+(function() {
+  var t = document.documentElement.getAttribute('data-theme') || 'light';
+  var btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = t === 'dark' ? '☀ Light' : '☾ Dark';
+})();
+</script>
 
 <script>
 (function() {

@@ -6,12 +6,46 @@
 <title>Discussion Board</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('scribe-theme')||'light')</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
+  :root {
+    --b-bg:       #f5f0e8;
+    --b-tile:     #faf7f2;
+    --b-char:     #1a1410;
+    --b-grid:     #d4c4a8;
+    --b-lo:       rgba(0,0,0,0.08);
+    --b-hi:       rgba(255,255,255,0.8);
+    --b-split:    rgba(0,0,0,0.12);
+    --b-mid:      #e8dfc8;
+    --b-shadow:   0 4px 24px rgba(0,0,0,0.15);
+    --b-inset:    rgba(0,0,0,0.06);
+    --b-title:    #4a4038;
+    --b-status:   #a09070;
+    --b-prompt:   #7a6040;
+    --b-arrow:    #b07010;
+  }
+  html[data-theme="dark"] {
+    --b-bg:       #0d0d0b;
+    --b-tile:     #141412;
+    --b-char:     #f0b429;
+    --b-grid:     #060604;
+    --b-lo:       rgba(0,0,0,0.6);
+    --b-hi:       rgba(255,255,255,0.03);
+    --b-split:    rgba(0,0,0,0.8);
+    --b-mid:      #0a0a08;
+    --b-shadow:   0 12px 64px rgba(0,0,0,0.7);
+    --b-inset:    rgba(240,180,41,0.1);
+    --b-title:    #555550;
+    --b-status:   #3a3a36;
+    --b-prompt:   #666660;
+    --b-arrow:    #f0b429;
+  }
+
   body {
-    background: #0d0d0b;
-    color: #ede8df;
+    background: var(--b-bg);
+    color: var(--b-char);
     font-family: 'Space Mono', 'Courier New', monospace;
     min-height: 100vh;
     display: flex;
@@ -25,7 +59,7 @@
   #unlock-overlay {
     position: fixed;
     inset: 0;
-    background: #0d0d0b;
+    background: var(--b-bg);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -36,12 +70,12 @@
   }
   #unlock-overlay h2 {
     font-size: 1rem;
-    color: #f0b429;
+    color: var(--b-arrow);
     letter-spacing: 0.3em;
     text-transform: uppercase;
   }
   #unlock-overlay p {
-    color: #555550;
+    color: var(--b-status);
     font-size: 0.72rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
@@ -60,7 +94,7 @@
     font-size: 0.6rem;
     letter-spacing: 0.4em;
     text-transform: uppercase;
-    color: #555550;
+    color: var(--b-title);
     text-align: center;
   }
 
@@ -69,27 +103,27 @@
     display: grid;
     grid-template-columns: repeat(22, 1fr);
     gap: 3px;
-    background: #060604;
+    background: var(--b-grid);
     padding: 8px;
     border-radius: 3px;
-    box-shadow: 0 12px 64px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(240,180,41,0.1);
+    box-shadow: var(--b-shadow), inset 0 0 0 1px var(--b-inset);
     width: 100%;
     max-width: 900px;
   }
 
   .tile {
     aspect-ratio: 0.65;
-    background: #141412;
+    background: var(--b-tile);
     border-radius: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: clamp(0.7rem, 2.2vw, 1.3rem);
     font-weight: 700;
-    color: #f0b429;
+    color: var(--b-char);
     position: relative;
     overflow: hidden;
-    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
+    box-shadow: inset 0 -1px 0 var(--b-lo), inset 0 1px 0 var(--b-hi);
   }
 
   /* Horizontal split line — the signature Vestaboard detail */
@@ -99,7 +133,7 @@
     left: 0; right: 0;
     top: 50%;
     height: 1px;
-    background: rgba(0,0,0,0.8);
+    background: var(--b-split);
     pointer-events: none;
   }
 
@@ -109,7 +143,7 @@
 
   @keyframes flip {
     0%   { transform: scaleY(1); }
-    50%  { transform: scaleY(0); background: #0a0a08; }
+    50%  { transform: scaleY(0); background: var(--b-mid); }
     100% { transform: scaleY(1); }
   }
 
@@ -165,6 +199,24 @@
   <div id="prompts-area"></div>
   <div id="board-status">Waiting for facilitator…</div>
 </div>
+
+<button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>
+
+<script>
+// ── Theme toggle ──────────────────────────────
+window._toggleTheme = function() {
+  var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('scribe-theme', next);
+  var btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = next === 'dark' ? '☀ Light' : '☾ Dark';
+};
+(function() {
+  var t = document.documentElement.getAttribute('data-theme') || 'light';
+  var btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = t === 'dark' ? '☀ Light' : '☾ Dark';
+})();
+</script>
 
 <script>
 (function() {
