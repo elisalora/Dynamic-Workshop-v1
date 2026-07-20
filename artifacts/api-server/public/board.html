@@ -4,13 +4,15 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Discussion Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: #f5f0e8;
-    color: #1a1410;
-    font-family: 'Courier New', Courier, monospace;
+    background: #0d0d0b;
+    color: #ede8df;
+    font-family: 'Space Mono', 'Courier New', monospace;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -23,7 +25,7 @@
   #unlock-overlay {
     position: fixed;
     inset: 0;
-    background: #f5f0e8;
+    background: #0d0d0b;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -33,15 +35,16 @@
     cursor: pointer;
   }
   #unlock-overlay h2 {
-    font-size: 1.25rem;
-    color: #8b6a40;
-    letter-spacing: 0.2em;
+    font-size: 1rem;
+    color: #f0b429;
+    letter-spacing: 0.3em;
     text-transform: uppercase;
   }
   #unlock-overlay p {
-    color: #a08060;
-    font-size: 0.9rem;
-    letter-spacing: 0.1em;
+    color: #555550;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
   }
 
   #board-wrap {
@@ -49,15 +52,15 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2rem;
+    gap: 1.75rem;
     width: 100%;
   }
 
   #board-title {
-    font-size: 0.7rem;
-    letter-spacing: 0.3em;
+    font-size: 0.6rem;
+    letter-spacing: 0.4em;
     text-transform: uppercase;
-    color: #4a4038;
+    color: #555550;
     text-align: center;
   }
 
@@ -66,37 +69,37 @@
     display: grid;
     grid-template-columns: repeat(22, 1fr);
     gap: 3px;
-    background: #d4c4a8;
+    background: #060604;
     padding: 8px;
-    border-radius: 6px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.12), inset 0 0 12px rgba(0,0,0,0.06);
+    border-radius: 3px;
+    box-shadow: 0 12px 64px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(240,180,41,0.1);
     width: 100%;
     max-width: 900px;
   }
 
   .tile {
     aspect-ratio: 0.65;
-    background: #faf7f2;
+    background: #141412;
     border-radius: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: clamp(0.7rem, 2.2vw, 1.3rem);
     font-weight: 700;
-    color: #1a1410;
+    color: #f0b429;
     position: relative;
     overflow: hidden;
-    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03);
   }
 
-  /* Horizontal split line */
+  /* Horizontal split line — the signature Vestaboard detail */
   .tile::after {
     content: '';
     position: absolute;
     left: 0; right: 0;
     top: 50%;
     height: 1px;
-    background: rgba(0,0,0,0.12);
+    background: rgba(0,0,0,0.8);
     pointer-events: none;
   }
 
@@ -106,26 +109,27 @@
 
   @keyframes flip {
     0%   { transform: scaleY(1); }
-    50%  { transform: scaleY(0); background: #e8dfc8; }
+    50%  { transform: scaleY(0); background: #0a0a08; }
     100% { transform: scaleY(1); }
   }
 
   /* ── Prompts ────────────────────────── */
   #prompts-area {
     text-align: center;
-    min-height: 6rem;
+    min-height: 5rem;
     max-width: 700px;
     width: 100%;
   }
 
   .prompt-item {
-    font-size: clamp(0.85rem, 2vw, 1.15rem);
-    color: #7a6040;
-    line-height: 1.6;
-    padding: 0.4rem 0;
+    font-size: clamp(0.72rem, 1.6vw, 0.95rem);
+    color: #666660;
+    line-height: 1.7;
+    padding: 0.35rem 0;
     opacity: 0;
     transform: translateY(8px);
     transition: opacity 0.5s ease, transform 0.5s ease;
+    letter-spacing: 0.04em;
   }
   .prompt-item.visible {
     opacity: 1;
@@ -133,15 +137,15 @@
   }
   .prompt-item::before {
     content: '→ ';
-    color: #b08050;
+    color: #f0b429;
   }
 
   /* ── Status ─────────────────────────── */
   #board-status {
-    font-size: 0.65rem;
-    letter-spacing: 0.2em;
+    font-size: 0.58rem;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
-    color: #a09070;
+    color: #3a3a36;
     text-align: center;
   }
 </style>

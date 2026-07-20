@@ -5,21 +5,21 @@
 <meta name="viewport" content="width=1920"/>
 <title>Scribe Board</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;1,8..60,400&family=Space+Grotesk:wght@400;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;600;700&family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;1,8..60,400&display=swap');
 
   :root {
-    --paper:         #f5f0e8;
-    --ink:           #1a1410;
-    --ink-muted:     #6a5a48;
-    --accent:        #8b4513;
-    --accent-light:  #c8956a;
-    --card-bg:       #faf7f2;
-    --card-border:   #d4c4a8;
-    --quote-bg:      #fff9f0;
-    --syn-bg:        #2c1810;
-    --syn-text:      #f5f0e8;
-    --flag-bg:       #e8d5b0;
-    --flag-text:     #5a3a0a;
+    --paper:         #0d0d0b;
+    --ink:           #ede8df;
+    --ink-muted:     #8a8880;
+    --accent:        #f0b429;
+    --accent-light:  #c8941a;
+    --card-bg:       #181816;
+    --card-border:   #2c2c28;
+    --quote-bg:      #1c1c1a;
+    --syn-bg:        #f0b429;
+    --syn-text:      #0d0d00;
+    --flag-bg:       #242420;
+    --flag-text:     #f0b429;
     --ticker-h:      3.5rem;
     --header-h:      3.75rem;
   }
@@ -58,9 +58,11 @@
     padding: 3rem 4rem;
   }
   #start-screen h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(2.5rem, 6vw, 5.5rem);
-    letter-spacing: -0.02em;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(2rem, 5.5vw, 5rem);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
   }
   .start-quill {
     opacity: 0.35;
@@ -79,9 +81,9 @@
     max-width: 700px;
     width: 100%;
     text-align: left;
-    background: rgba(139,69,19,0.06);
-    border: 1px solid var(--card-border);
-    border-radius: 10px;
+    background: rgba(240,180,41,0.06);
+    border: 1px solid rgba(240,180,41,0.2);
+    border-radius: 4px;
     padding: 1.25rem 1.5rem;
   }
   #start-questions.visible { display: block; }
@@ -94,8 +96,8 @@
     margin-bottom: 0.75rem;
   }
   .sq-item {
-    font-family: 'Source Serif 4', serif;
-    font-size: clamp(1rem, 1.8vw, 1.5rem);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(0.95rem, 1.7vw, 1.4rem);
     color: var(--ink);
     line-height: 1.4;
     padding-left: 1.4em;
@@ -126,7 +128,7 @@
     letter-spacing: 0.08em;
     transition: background 0.2s, transform 0.1s;
   }
-  #start-btn:hover  { background: #6b3410; }
+  #start-btn:hover  { background: #c8941a; }
   #start-btn:active { transform: scale(0.97); }
   #chatham-notice {
     display: flex;
@@ -135,15 +137,17 @@
     max-width: 480px;
     margin: 1.5rem auto 1.1rem;
     padding: 0.85rem 1.1rem;
-    background: rgba(0,0,0,0.06);
-    border: 1px solid rgba(0,0,0,0.12);
-    border-radius: 8px;
-    color: #3a2e28;
-    font-size: clamp(0.78rem, 1.4vw, 0.92rem);
-    line-height: 1.55;
+    background: rgba(240,180,41,0.06);
+    border: 1px solid rgba(240,180,41,0.2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+    color: var(--ink-muted);
+    font-size: clamp(0.75rem, 1.3vw, 0.88rem);
+    font-family: 'Space Mono', monospace;
+    line-height: 1.6;
     text-align: left;
   }
-  #chatham-notice strong { color: #1a1410; font-weight: 600; }
+  #chatham-notice strong { color: var(--ink); font-weight: 700; }
   #demo-note {
     color: var(--accent);
     font-size: 1.1rem;
@@ -169,8 +173,8 @@
     gap: 1rem;
     padding: 0 1.5rem;
     border-bottom: 1.5px solid var(--card-border);
-    background: rgba(245,240,232,0.92);
-    backdrop-filter: blur(4px);
+    background: rgba(13,13,11,0.96);
+    backdrop-filter: blur(8px);
     position: relative;
     overflow: hidden;
   }
@@ -193,8 +197,10 @@
     transform: scaleX(-1);
   }
   #board-title {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(1.3rem, 2.6vw, 2.2rem);
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: clamp(1rem, 2.2vw, 1.8rem);
     flex: 1;
     white-space: nowrap;
     overflow: hidden;
@@ -203,13 +209,13 @@
     z-index: 1;
   }
   .status-dot {
-    width: 14px; height: 14px;
+    width: 10px; height: 10px;
     border-radius: 50%;
-    background: #c8b8a0;
+    background: #333330;
     flex-shrink: 0;
     position: relative; z-index: 1;
   }
-  .status-dot.connected { background: #7aaa7a; }
+  .status-dot.connected { background: #4ade80; }
   .status-dot.recording { background: var(--accent); animation: blink 1.4s infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
@@ -239,8 +245,8 @@
     white-space: nowrap;
   }
   #synthesis-text {
-    font-family: 'Source Serif 4', serif;
-    font-size: clamp(0.95rem, 1.75vw, 1.55rem);
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(0.88rem, 1.6vw, 1.4rem);
     line-height: 1.35;
     flex: 1;
   }
@@ -261,7 +267,7 @@
   .cluster-card {
     background: var(--card-bg);
     border: 1.5px solid var(--card-border);
-    border-radius: 10px;
+    border-radius: 3px;
     padding: 1rem 1.1rem 0.9rem;
     display: flex;
     flex-direction: column;
@@ -275,15 +281,15 @@
   }
   .cluster-card.emphasized {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(139,69,19,0.18);
+    box-shadow: 0 0 0 2px rgba(240,180,41,0.25);
   }
-  /* ink-bloom ring on new card */
+  /* bloom ring on new card */
   .cluster-card::after {
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 10px;
-    background: radial-gradient(circle at 50% 50%, rgba(200,149,106,0.18) 0%, transparent 70%);
+    border-radius: 3px;
+    background: radial-gradient(circle at 50% 50%, rgba(240,180,41,0.12) 0%, transparent 70%);
     pointer-events: none;
     animation: bloomFade 1.2s ease-out forwards;
   }
@@ -301,23 +307,19 @@
   }
 
   .cluster-label {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Space Grotesk', sans-serif;
     font-weight: 700;
-    font-size: clamp(1rem, 2vw, 1.75rem);
+    font-size: clamp(0.95rem, 1.8vw, 1.55rem);
     color: var(--accent);
     line-height: 1.15;
     margin-bottom: 0.5rem;
     flex-shrink: 0;
     padding-right: 2.8rem; /* clear botanical */
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
-  /* decorative underline on label */
   .cluster-label-inner {
     display: inline;
-    background-image: linear-gradient(var(--accent-light), var(--accent-light));
-    background-repeat: no-repeat;
-    background-size: 100% 1.5px;
-    background-position: 0 95%;
-    padding-bottom: 1px;
   }
 
   .idea-list {
@@ -382,8 +384,8 @@
   .quote-pill {
     flex: 1 1 0;
     min-width: 0;
-    font-family: 'Source Serif 4', serif;
-    font-style: italic;
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(0.75rem, 1.2vw, 1rem) !important;
     font-size: clamp(0.82rem, 1.4vw, 1.2rem);
     color: var(--ink-muted);
     border-left: 3px solid var(--accent-light);
@@ -432,8 +434,9 @@
     align-items: center;
     gap: 0.9rem;
     padding: 0 1.5rem;
-    background: var(--ink);
-    color: var(--paper);
+    background: #000000;
+    color: var(--accent);
+    border-top: 1px solid var(--card-border);
   }
   .ticker-icon { opacity: 0.4; flex-shrink: 0; }
   .ticker-label {
@@ -444,8 +447,7 @@
     flex-shrink: 0;
   }
   #ticker-text {
-    font-family: 'Source Serif 4', serif;
-    font-style: italic;
+    font-family: 'Space Mono', monospace;
     font-size: clamp(0.88rem, 1.55vw, 1.25rem);
     opacity: .82;
     overflow: hidden;
