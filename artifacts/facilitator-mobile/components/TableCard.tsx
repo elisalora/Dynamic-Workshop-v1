@@ -17,6 +17,7 @@ import Svg, { Rect } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import type { TableData, Workshop } from '@/context/ConsoleContext';
 import { useConsole } from '@/context/ConsoleContext';
+import { getPodUrl } from '@/utils/podUrl';
 
 // ── Status chip ───────────────────────────────────────────────────────────────
 
@@ -157,7 +158,7 @@ export function TableCard({ table, workshops }: Props) {
 
   const handleShare = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const url = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${table.id}`;
+    const url = getPodUrl(table.id);
     if (Platform.OS === 'web') {
       try {
         await navigator.clipboard.writeText(url);
@@ -291,7 +292,7 @@ export function TableCard({ table, workshops }: Props) {
                   <View style={[styles.urlRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                     <Ionicons name="link-outline" size={12} color={colors.mutedForeground} />
                     <TextInput
-                      value={`https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${table.id}`}
+                      value={getPodUrl(table.id)}
                       editable={false}
                       selectTextOnFocus
                       style={[styles.urlInput, { color: colors.mutedForeground }]}

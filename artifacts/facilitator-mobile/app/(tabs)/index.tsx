@@ -20,6 +20,7 @@ import { TableCard } from '@/components/TableCard';
 import { WorkshopFolder } from '@/components/WorkshopFolder';
 import { SummaryModal } from '@/components/SummaryModal';
 import { CreateSessionSheet, CreateWorkshopSheet } from '@/components/CreateSheet';
+import { getPodUrl } from '@/utils/podUrl';
 
 type SummaryTarget = { wsId: string; wsName: string; generate: boolean } | null;
 
@@ -281,7 +282,7 @@ function WaitingCard({ session }: { session: import('@/context/ConsoleContext').
 
   const handleShare = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const url = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${session.tableId}`;
+    const url = getPodUrl(session.tableId);
     if (Platform.OS === 'web') {
       try {
         await navigator.clipboard.writeText(url);
@@ -330,7 +331,7 @@ function WaitingCard({ session }: { session: import('@/context/ConsoleContext').
         <Ionicons name="link-outline" size={12} color={colors.mutedForeground} />
         {Platform.OS === 'web' ? (
           <TextInput
-            value={`https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${session.tableId}`}
+            value={getPodUrl(session.tableId)}
             editable={false}
             selectTextOnFocus
             style={[styles.linkInput, { color: colors.mutedForeground }]}
