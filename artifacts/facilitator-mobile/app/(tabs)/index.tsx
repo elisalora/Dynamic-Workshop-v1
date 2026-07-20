@@ -8,6 +8,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -327,9 +328,18 @@ function WaitingCard({ session }: { session: import('@/context/ConsoleContext').
       )}
       <View style={[styles.linkRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <Ionicons name="link-outline" size={12} color={colors.mutedForeground} />
-        <Text style={[styles.linkText, { color: colors.mutedForeground }]} numberOfLines={1}>
-          Pod link ready — tap to share
-        </Text>
+        {Platform.OS === 'web' ? (
+          <TextInput
+            value={`https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${session.tableId}`}
+            editable={false}
+            selectTextOnFocus
+            style={[styles.linkInput, { color: colors.mutedForeground }]}
+          />
+        ) : (
+          <Text style={[styles.linkText, { color: colors.mutedForeground }]} numberOfLines={1}>
+            Pod link ready — tap to share
+          </Text>
+        )}
         <Pressable
           onPress={handleShare}
           hitSlop={4}
@@ -570,6 +580,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
+  },
+  linkInput: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    // Removes default browser input chrome on web
+    ...(Platform.OS === 'web' ? { outlineWidth: 0, cursor: 'text' } as any : {}),
   },
   shareBtn: {
     flexDirection: 'row',

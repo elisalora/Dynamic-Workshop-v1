@@ -8,6 +8,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -286,6 +287,17 @@ export function TableCard({ table, workshops }: Props) {
                 )}
 
                 {/* Actions */}
+                {Platform.OS === 'web' && (
+                  <View style={[styles.urlRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <Ionicons name="link-outline" size={12} color={colors.mutedForeground} />
+                    <TextInput
+                      value={`https://${process.env.EXPO_PUBLIC_DOMAIN}/api/pod.html?table=${table.id}`}
+                      editable={false}
+                      selectTextOnFocus
+                      style={[styles.urlInput, { color: colors.mutedForeground }]}
+                    />
+                  </View>
+                )}
                 <View style={[styles.actionsRow, { borderTopColor: colors.border }]}>
                   <Pressable
                     onPress={handleAssignWorkshop}
@@ -489,5 +501,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
     fontStyle: 'italic',
+  },
+  urlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  urlInput: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    // Remove default browser input chrome on web
+    ...(Platform.OS === 'web' ? { outlineWidth: 0, cursor: 'text' } as any : {}),
   },
 });
