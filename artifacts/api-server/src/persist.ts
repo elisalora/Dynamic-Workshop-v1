@@ -132,6 +132,8 @@ export async function ensureSchema(): Promise<void> {
 
     -- Add write_seq to active_tables for databases created before this column existed
     ALTER TABLE active_tables ADD COLUMN IF NOT EXISTS write_seq BIGINT NOT NULL DEFAULT 0;
+    -- Add logo_url to workshops for databases created before this column existed
+    ALTER TABLE workshops ADD COLUMN IF NOT EXISTS logo_url TEXT;
   `);
   logger.info("Database schema verified / created");
 }
@@ -156,6 +158,7 @@ export async function hydrateFromDb(): Promise<void> {
       name: row.name,
       sessionIds: row.session_ids as string[],
       createdAt: Number(row.created_at),
+      logoUrl: row.logo_url ?? undefined,
     };
     workshops.set(w.id, w);
   }
@@ -237,13 +240,14 @@ export function persistWorkshop(w: Workshop): void {
   const name = w.name;
   const sessionIds = JSON.stringify(w.sessionIds);
   const createdAt = w.createdAt;
+  const logoUrl = w.logoUrl ?? null;
 
   enqueue(`workshop:${id}`, () =>
     getPool().query(
-      `INSERT INTO workshops (id, name, session_ids, created_at)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, session_ids = EXCLUDED.session_ids`,
-      [id, name, sessionIds, createdAt],
+      `INSERT INTO workshops (id, name, session_ids, created_at, logo_url)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, session_ids = EXCLUDED.session_ids, logo_url = EXCLUDED.logo_url`,
+      [id, name, sessionIds, createdAt, logoUrl],
     ).then(() => undefined),
   );
 }

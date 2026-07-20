@@ -5,6 +5,8 @@ import { URL } from "node:url";
 import {
   getOrCreateTable,
   sessionConfigs,
+  sessions,
+  workshops,
   podSockets,
   consoleSockets,
   boardSockets,
@@ -72,6 +74,15 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
   const table = getOrCreateTable(tableId, resolvedTopic);
   podSockets.set(tableId, ws);
 
+  // Resolve workshop logo: tableId → session → workshop
+  let workshopLogo: string | null = null;
+  for (const s of sessions.values()) {
+    if (s.tableIds.includes(tableId) && s.workshopId) {
+      workshopLogo = workshops.get(s.workshopId)?.logoUrl ?? null;
+      break;
+    }
+  }
+
   // Send full canvas state + session questions on (re)connect
   ws.send(JSON.stringify({
     type: "canvas_state",
@@ -79,6 +90,7 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
     summary: table.summary,
     questions: cfg?.questions ?? [],
     sessionName: resolvedTopic,
+    workshopLogo,
   }));
 
   // Broadcast updated console

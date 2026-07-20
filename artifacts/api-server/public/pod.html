@@ -512,8 +512,11 @@
 <button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>
 
 <div id="start-screen">
-  <!-- Quill SVG above title -->
-  <svg class="start-quill" width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Workshop logo (shown when set) or quill SVG -->
+  <div id="ws-logo-wrap" style="display:none;margin-bottom:1.25rem;">
+    <img id="ws-logo" src="" alt="" style="max-height:90px;max-width:260px;object-fit:contain;border-radius:6px;"/>
+  </div>
+  <svg class="start-quill" id="start-quill" width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M52 4 C38 12, 18 28, 12 56"/>
     <path d="M52 4 C44 18, 36 22, 12 56"/>
     <path d="M52 4 C56 16, 48 26, 12 56"/>
@@ -551,6 +554,7 @@
       <circle cx="28" cy="18" r="2.5" fill="currentColor" opacity=".5"/>
       <circle cx="30" cy="25" r="1.8" fill="currentColor" opacity=".4"/>
     </svg>
+    <img id="board-logo" src="" alt="" style="display:none;height:26px;max-width:90px;object-fit:contain;border-radius:3px;opacity:0.85;flex-shrink:0;"/>
     <div id="board-title">Scribe Board</div>
     <div class="status-dot" id="status-dot"></div>
     <!-- Right flourish -->
@@ -791,6 +795,21 @@ window._toggleTheme = function() {
           // Show questions + session name on start screen before recording starts
           showQuestions(msg.questions, msg.sessionName);
           renderBoard(msg.board);
+          // Show workshop logo on start screen and board header
+          const logoWrap = document.getElementById('ws-logo-wrap');
+          const logoImg  = document.getElementById('ws-logo');
+          const boardLogo = document.getElementById('board-logo');
+          const quill    = document.getElementById('start-quill');
+          if (msg.workshopLogo) {
+            logoImg.src = msg.workshopLogo;
+            logoWrap.style.display = '';
+            if (quill) quill.style.display = 'none';
+            if (boardLogo) { boardLogo.src = msg.workshopLogo; boardLogo.style.display = ''; }
+          } else {
+            logoWrap.style.display = 'none';
+            if (quill) quill.style.display = '';
+            if (boardLogo) boardLogo.style.display = 'none';
+          }
         } else if (msg.type === 'tick') showTick(msg.text);
       } catch {}
     });

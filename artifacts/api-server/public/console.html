@@ -337,7 +337,16 @@
   .workshop-chevron { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; transition: transform 0.18s; }
   .workshop-chevron.open { transform: rotate(90deg); }
   .workshop-icon { font-size: 1.1rem; flex-shrink: 0; }
-  .workshop-name { font-weight: 700; font-size: 1rem; flex: 1; color: var(--text); }
+  .workshop-name { font-weight: 700; font-size: 1rem; flex: 1; color: var(--text); min-width: 0; }
+  .workshop-logo {
+    width: 30px; height: 30px;
+    border-radius: 3px;
+    object-fit: contain;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    padding: 2px;
+  }
   .workshop-count {
     font-size: 0.68rem;
     color: var(--muted);
@@ -978,6 +987,13 @@
       <label class="form-label" for="workshop-name">Workshop name</label>
       <input class="form-input" id="workshop-name" type="text" placeholder="e.g. Robotics Workshop 2026" autocomplete="off"/>
     </div>
+    <div class="form-row">
+      <label class="form-label" for="workshop-logo-url">Logo URL <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <input class="form-input" id="workshop-logo-url" type="url" placeholder="https://example.com/logo.png" autocomplete="off" style="flex:1;min-width:0;"/>
+        <img id="workshop-logo-preview" src="" alt="" style="display:none;height:36px;max-width:80px;object-fit:contain;border-radius:3px;border:1px solid var(--border);background:var(--surface);padding:3px;flex-shrink:0;"/>
+      </div>
+    </div>
     <div class="form-actions">
       <button class="btn-create" id="btn-create-workshop">Create workshop</button>
       <button class="btn-cancel" id="btn-cancel-workshop">Cancel</button>
@@ -1218,10 +1234,18 @@ window._toggleTheme = function() {
   }
 
   // ── New Workshop form ──────────────────────────────────
-  const wfForm   = document.getElementById('new-workshop-form');
-  const wfNameEl = document.getElementById('workshop-name');
-  const wfErrEl  = document.getElementById('form-error-workshop');
-  const btnNewWs = document.getElementById('btn-new-workshop');
+  const wfForm    = document.getElementById('new-workshop-form');
+  const wfNameEl  = document.getElementById('workshop-name');
+  const wfLogoEl  = document.getElementById('workshop-logo-url');
+  const wfLogoImg = document.getElementById('workshop-logo-preview');
+  const wfErrEl   = document.getElementById('form-error-workshop');
+  const btnNewWs  = document.getElementById('btn-new-workshop');
+
+  wfLogoEl.addEventListener('input', () => {
+    const url = wfLogoEl.value.trim();
+    if (url) { wfLogoImg.src = url; wfLogoImg.style.display = ''; }
+    else { wfLogoImg.style.display = 'none'; wfLogoImg.src = ''; }
+  });
 
   btnNewWs.addEventListener('click', () => {
     const opening = !wfForm.classList.contains('open');
@@ -1235,13 +1259,17 @@ window._toggleTheme = function() {
     wfForm.classList.remove('open');
     btnNewWs.textContent = '⊞ New Workshop';
     wfNameEl.value = '';
+    wfLogoEl.value = '';
+    wfLogoImg.style.display = 'none';
+    wfLogoImg.src = '';
     wfErrEl.textContent = '';
   }
   document.getElementById('btn-create-workshop').addEventListener('click', async () => {
     wfErrEl.textContent = '';
     const name = wfNameEl.value.trim();
     if (!name) { wfErrEl.textContent = 'Please enter a name.'; wfNameEl.focus(); return; }
-    const res = await apiFetch('/workshops', 'POST', { name });
+    const logoUrl = wfLogoEl.value.trim() || undefined;
+    const res = await apiFetch('/workshops', 'POST', { name, logoUrl });
     if (!res.ok) { wfErrEl.textContent = 'Failed: ' + await res.text(); return; }
     closeWorkshopForm();
   });
@@ -1418,11 +1446,14 @@ window._toggleTheme = function() {
       folder.innerHTML = `
         <div class="workshop-header" data-action="toggle-ws" data-wsid="${esc(w.id)}">
           <span class="workshop-chevron ${isOpen ? 'open' : ''}">▶</span>
-          <span class="workshop-icon">📁</span>
+          ${w.logoUrl
+            ? `<img class="workshop-logo" src="${esc(w.logoUrl)}" alt="" onerror="this.style.display='none'" title="${esc(w.name)} logo"/>`
+            : `<span class="workshop-icon">📁</span>`}
           <span class="workshop-name">${esc(w.name)}</span>
           <span class="workshop-count">${wSessions.length} session${wSessions.length !== 1 ? 's' : ''} · ${totalGroups} group${totalGroups !== 1 ? 's' : ''}</span>
           <div class="workshop-actions" onclick="event.stopPropagation()">
             <button class="btn-sm" data-action="add-session-to-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}" title="Add session">＋ Session</button>
+            <button class="btn-sm" data-action="set-logo-ws" data-wsid="${esc(w.id)}" data-wslogo="${esc(w.logoUrl||'')}" title="Set workshop logo">Logo</button>
             <button class="btn-sm" data-action="rename-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Rename</button>
             <button class="btn-sm btn-sm-danger" data-action="delete-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Delete</button>
           </div>
@@ -1458,6 +1489,12 @@ window._toggleTheme = function() {
       }
       if (action === 'add-session-to-ws') {
         openQuickSession(wsid);
+        return;
+      }
+      if (action === 'set-logo-ws') {
+        const current = btn.dataset.wslogo || '';
+        const url = prompt('Workshop logo URL (leave blank to remove):', current);
+        if (url !== null) apiFetch(`/workshops/${wsid}`, 'PATCH', { logoUrl: url.trim() });
         return;
       }
       if (action === 'rename-ws') {

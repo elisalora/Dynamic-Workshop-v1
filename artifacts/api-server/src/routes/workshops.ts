@@ -16,22 +16,23 @@ const router = Router();
 
 // Create a top-level workshop event
 router.post("/workshops", (req, res) => {
-  const { name } = req.body as { name?: string };
+  const { name, logoUrl } = req.body as { name?: string; logoUrl?: string };
   if (!name?.trim()) {
     res.status(400).json({ error: "name required" });
     return;
   }
-  const w = createWorkshop(name.trim());
+  const w = createWorkshop(name.trim(), logoUrl?.trim() || undefined);
   broadcastConsole(consoleSnapshot());
   res.json(w);
 });
 
-// Rename workshop
+// Rename or update workshop (name, logoUrl)
 router.patch("/workshops/:id", (req, res) => {
   const w = workshops.get(req.params["id"]!);
   if (!w) { res.status(404).json({ error: "not found" }); return; }
-  const { name } = req.body as { name?: string };
+  const { name, logoUrl } = req.body as { name?: string; logoUrl?: string };
   if (name?.trim()) w.name = name.trim();
+  if (logoUrl !== undefined) w.logoUrl = logoUrl.trim() || undefined;
   persistWorkshop(w);
   broadcastConsole(consoleSnapshot());
   res.json(w);

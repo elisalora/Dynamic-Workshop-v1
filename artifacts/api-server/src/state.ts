@@ -112,6 +112,7 @@ export interface Workshop {
   name: string;
   sessionIds: string[];
   createdAt: number;
+  logoUrl?: string;
 }
 
 export const tables = new Map<string, TableState>();
@@ -155,9 +156,9 @@ export function createSession(name: string, workshopId?: string): Session {
 }
 
 /** Create a top-level workshop event. */
-export function createWorkshop(name: string): Workshop {
+export function createWorkshop(name: string, logoUrl?: string): Workshop {
   const id = Math.random().toString(36).slice(2, 8).toUpperCase();
-  const w: Workshop = { id, name, sessionIds: [], createdAt: Date.now() };
+  const w: Workshop = { id, name, sessionIds: [], createdAt: Date.now(), logoUrl };
   workshops.set(id, w);
   getPersist().then((p) => p.persistWorkshop(w)).catch(() => {});
   return w;
@@ -309,6 +310,7 @@ export function consoleSnapshot() {
     name: w.name,
     sessionIds: w.sessionIds,
     createdAt: w.createdAt,
+    logoUrl: w.logoUrl ?? null,
   }));
 
   const archivedArr = Array.from(archivedTables.values()).map((t) => {
