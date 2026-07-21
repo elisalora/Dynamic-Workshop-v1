@@ -158,9 +158,51 @@ function applyOps(tableId: string, ops: unknown[]): void {
 
 export async function runScribeForTable(tableId: string): Promise<void> {
   const table = tables.get(tableId);
-  if (!table || !table.hasNewSpeech) return;
+  if (!table) return;
+
+  const hasCorrections = table.corrections.length > 0;
+  if (!table.hasNewSpeech && !hasCorrections) return;
 
   const newSegments = table.transcript.slice(table.newTranscriptSince);
+
+  // Corrections can arrive without new speech (mic idle). Still run the scribe
+  // so they are applied immediately. Use a short recent window as "new" context.
+  if (newSegments.length === 0 && hasCorrections) {
+    // Pull up to 5 recent segments as stand-in transcript so Claude has context
+    const recentStart = Math.max(0, table.transcript.length - 5);
+    const recentSegments = table.transcript.slice(recentStart);
+    table.newTranscriptSince = table.transcript.length;
+    table.hasNewSpeech = false;
+    table.lastScribeAt = Date.now();
+
+    const transcriptText = recentSegments.length
+      ? recentSegments.map((s) => s.text).join(" ")
+      : "(no new speech — apply facilitator corrections only)";
+
+    const correctionBlock = `\n\nFACILITATOR CORRECTIONS:\n${table.corrections.map((c) => `- ${c}`).join("\n")}`;
+    table.corrections = [];
+
+    const userContent = `Table: ${tableId}\nTopic: ${table.topic}\n\nNEW TRANSCRIPT (analyse and act on this):\n${transcriptText}${correctionBlock}\n\nCURRENT BOARD STATE:\n${boardDigest(table.board)}`;
+
+    logger.info({ tableId }, "Running scribe (correction-only)");
+
+    let raw = "";
+    try {
+      raw = await callAnthropic(SCRIBE_SYSTEM, userContent);
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      const parsed = JSON.parse(cleaned) as { summary?: string; ops?: unknown[] };
+      table.summary = parsed.summary ?? table.summary;
+      applyOps(tableId, Array.isArray(parsed.ops) ? parsed.ops : []);
+      jsonlLog({ kind: "scribe_correction", table: tableId, summary: table.summary });
+      persistActiveTable(table);
+      sendToPod(tableId, { type: "canvas_state", board: table.board, summary: table.summary });
+      broadcastConsoleState();
+    } catch (err) {
+      logger.error({ err, tableId, raw }, "Correction-only scribe error");
+    }
+    return;
+  }
+
   if (newSegments.length === 0) return;
 
   table.newTranscriptSince = table.transcript.length;

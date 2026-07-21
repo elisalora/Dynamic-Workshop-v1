@@ -197,8 +197,9 @@ export async function hydrateFromDb(): Promise<void> {
       metrics: row.metrics as TableState["metrics"],
       lastScribeAt: Number(row.last_scribe_at),
       hasNewSpeech: false,
-      wordBuckets: new Map(), // ephemeral — reset on restart
-      allWordsSeen: new Set(), // ephemeral — reset on restart
+      corrections: [],            // ephemeral — reset on restart
+      wordBuckets: new Map(),     // ephemeral — reset on restart
+      allWordsSeen: new Set(),    // ephemeral — reset on restart
     };
     tables.set(t.id, t);
   }
@@ -214,6 +215,7 @@ export async function hydrateFromDb(): Promise<void> {
       metrics: row.metrics as TableState["metrics"],
       lastScribeAt: 0,
       hasNewSpeech: false,
+      corrections: [],
       wordBuckets: new Map(),
       allWordsSeen: new Set(),
     };
