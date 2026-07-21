@@ -319,19 +319,24 @@ window._toggleTheme = function() {
     }
     if (currentRow) rows.push(currentRow);
 
-    // Pad/truncate to ROWS rows, each padded to COLS
-    const paddedRows = [];
-    for (let r = 0; r < ROWS; r++) {
-      const row = (rows[r] ?? '').padEnd(COLS, ' ').slice(0, COLS);
-      paddedRows.push(row);
-    }
-
-    // Center each row
-    const centeredRows = paddedRows.map(row => {
+    // Center each content row horizontally, truncate if over COLS
+    const contentRows = rows.slice(0, ROWS).map(row => {
       const trimmed = row.trimEnd();
       const pad = Math.floor((COLS - trimmed.length) / 2);
-      return (' '.repeat(pad) + trimmed).padEnd(COLS, ' ');
+      return (' '.repeat(pad) + trimmed).padEnd(COLS, ' ').slice(0, COLS);
     });
+
+    // Vertically center: offset content so it sits in the middle of the grid
+    const rowOffset = Math.floor((ROWS - contentRows.length) / 2);
+    const centeredRows = [];
+    for (let r = 0; r < ROWS; r++) {
+      const contentIdx = r - rowOffset;
+      centeredRows.push(
+        contentIdx >= 0 && contentIdx < contentRows.length
+          ? contentRows[contentIdx]
+          : ' '.repeat(COLS)
+      );
+    }
 
     const flipPromises = [];
 
