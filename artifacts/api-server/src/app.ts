@@ -61,4 +61,7 @@ app.use("/api", express.static(publicDir));
 // Health + API routes (router also mounted at /api)
 app.use("/api", router);
 
+// Root redirect → facilitator console
+app.get("/", (_req, res) => res.redirect("/api/console.html"));
+
 export default app;
