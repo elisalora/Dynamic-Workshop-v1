@@ -183,21 +183,21 @@
     display: none;
   }
 
-  /* ── Theme toggle ── */
+  /* ── Theme toggle (lives inside the header bar) ── */
   #theme-toggle {
-    position: fixed;
-    top: 1rem; right: 1rem;
-    z-index: 200;
-    background: var(--card-bg);
+    background: transparent;
     border: 1px solid var(--card-border);
     border-radius: 3px;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.72rem;
+    padding: 0.22rem 0.65rem;
+    font-size: 0.7rem;
     font-family: 'Space Mono', monospace;
     letter-spacing: 0.08em;
     color: var(--ink-muted);
     cursor: pointer;
     transition: all 0.15s;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
   }
   #theme-toggle:hover { color: var(--ink); border-color: var(--accent); }
 
@@ -693,8 +693,6 @@
 <canvas id="bg-canvas"></canvas>
 
 <!-- ─── Start screen ──────────────────────────────────── -->
-<button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>
-
 <div id="start-screen">
   <!-- Workshop logo (shown when set) or quill SVG -->
   <div id="ws-logo-wrap" style="display:none;margin-bottom:1.25rem;">
@@ -740,6 +738,7 @@
     </svg>
     <img id="board-logo" src="" alt="" style="display:none;height:26px;max-width:90px;object-fit:contain;border-radius:3px;opacity:0.85;flex-shrink:0;"/>
     <div id="board-title">Scribe Board</div>
+    <button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>
     <button id="overview-btn" title="Toggle overview / detail">⊞ Overview</button>
     <div class="status-dot" id="status-dot"></div>
     <!-- Right flourish -->
