@@ -55,7 +55,8 @@ app.get("/api/auth/config", (_req, res) => {
 });
 
 // Serve static HTML pages (pod, board, console — auth is enforced client-side in console.html)
-const publicDir = path.resolve(process.cwd(), "public");
+// Use __dirname (dist/) so this resolves correctly regardless of cwd (dev vs production)
+const publicDir = path.resolve(__dirname, "../public");
 app.use("/api", express.static(publicDir));
 
 // Health + API routes (router also mounted at /api)
