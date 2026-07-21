@@ -6,8 +6,8 @@ import { recordWords } from "./metrics.js";
 import { jsonlLog } from "./jsonl-log.js";
 import { logger } from "./lib/logger.js";
 
-const DG_URL =
-  "wss://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&interim_results=false&language=en";
+const DG_BASE =
+  "wss://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&interim_results=false&language=en&encoding=linear16";
 const KEEPALIVE_INTERVAL_MS = 5_000;
 const RECONNECT_DELAY_MS = 2_000;
 
@@ -41,7 +41,7 @@ interface DGMessage {
 // Track active Deepgram connections per table
 const dgConnections = new Map<string, ClientWs>();
 
-export function connectDeepgram(tableId: string): void {
+export function connectDeepgram(tableId: string, sampleRate = 48000): void {
   const key = process.env["DEEPGRAM_API_KEY"];
   if (!key) {
     logger.warn({ tableId }, "DEEPGRAM_API_KEY not set — ASR disabled");
@@ -56,7 +56,8 @@ export function connectDeepgram(tableId: string): void {
 
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
-  const dg = new WebSocket(DG_URL, { headers: { Authorization: `Token ${key}` } });
+  const url = `${DG_BASE}&sample_rate=${sampleRate}`;
+  const dg = new WebSocket(url, { headers: { Authorization: `Token ${key}` } });
   dgConnections.set(tableId, dg as unknown as ClientWs);
 
   dg.on("open", () => {

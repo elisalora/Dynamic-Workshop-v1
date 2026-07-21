@@ -96,23 +96,32 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
   // Broadcast updated console
   broadcastConsole(consoleSnapshot());
 
-  // Connect Deepgram lazily — only when the first audio chunk arrives.
-  // This avoids a rapid connect/close loop when the pod is on the start
-  // screen (WS open but mic not yet recording).
+  // Connect Deepgram lazily — only when the pod sends a start_audio message
+  // (which includes the browser's actual AudioContext sample rate).
   let dgStarted = false;
 
   ws.on("message", (data, isBinary) => {
     if (isBinary) {
-      // Binary audio chunk — connect Deepgram on first chunk, then forward.
+      // Binary linear16 PCM chunk — forward to Deepgram.
+      // If somehow we get audio before start_audio, connect with default rate.
       if (!dgStarted) {
         dgStarted = true;
-        connectDeepgram(tableId);
+        connectDeepgram(tableId, 48000);
       }
       sendAudioToDg(tableId, data as Buffer);
     } else {
-      // Text message (demo mode transcript injection)
+      // Text message (start_audio handshake or demo mode)
       try {
         const msg = JSON.parse(data.toString()) as Record<string, unknown>;
+        if (msg["type"] === "start_audio") {
+          // Browser reports its AudioContext sample rate so Deepgram gets the right value
+          const sampleRate = typeof msg["sampleRate"] === "number" ? msg["sampleRate"] : 48000;
+          if (!dgStarted) {
+            dgStarted = true;
+            connectDeepgram(tableId, sampleRate);
+          }
+          return;
+        }
         if (msg["type"] === "demo_transcript") {
           const text = String(msg["text"] ?? "");
           if (!text.trim()) return;

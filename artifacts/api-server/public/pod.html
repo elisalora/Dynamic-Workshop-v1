@@ -819,19 +819,40 @@ window._toggleTheme = function() {
     });
   }
 
-  // ── Recording ────────────────────────────────────────────
-  function startSegment() {
+  // ── Recording — raw linear16 PCM via AudioContext ────────
+  // MediaRecorder sends a webm container which Deepgram can't reliably
+  // decode without an explicit encoding declaration. Raw PCM is unambiguous.
+  function startAudioPipeline() {
     if (!stream || !ws || ws.readyState !== WebSocket.OPEN) return;
-    const mr = new MediaRecorder(stream, {
-      mimeType: 'audio/webm;codecs=opus',
-      audioBitsPerSecond: 64000,
-    });
-    mr.addEventListener('dataavailable', (e) => {
-      if (e.data?.size > 0 && ws?.readyState === WebSocket.OPEN) ws.send(e.data);
-    });
-    mr.start(250);
-    document.getElementById('status-dot').className = 'status-dot recording';
-    setTimeout(() => { try { mr.stop(); } catch {} }, 25000);
+    try {
+      const audioCtx = new AudioContext();
+      const source   = audioCtx.createMediaStreamSource(stream);
+
+      // Tell the server (and Deepgram) the exact sample rate before any audio.
+      ws.send(JSON.stringify({ type: 'start_audio', sampleRate: audioCtx.sampleRate }));
+
+      // ScriptProcessorNode fires every bufferSize frames (~85 ms at 48 kHz).
+      // Deprecated but universally supported; AudioWorklet needs a separate file.
+      const bufSize   = 4096;
+      const processor = audioCtx.createScriptProcessor(bufSize, 1, 1);
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      processor.onaudioprocess = (e) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const f32  = e.inputBuffer.getChannelData(0);
+        const i16  = new Int16Array(f32.length);
+        for (let i = 0; i < f32.length; i++) {
+          // clamp and scale float32 [-1,1] → int16
+          i16[i] = Math.max(-32768, Math.min(32767, f32[i] * 32768));
+        }
+        ws.send(i16.buffer);
+      };
+
+      document.getElementById('status-dot').className = 'status-dot recording';
+    } catch (err) {
+      alert('Audio pipeline error: ' + err.message);
+    }
   }
 
   // ── Start button ─────────────────────────────────────────
@@ -856,8 +877,7 @@ window._toggleTheme = function() {
         await new Promise((res) =>
           ws.readyState === WebSocket.OPEN ? res() : ws.addEventListener('open', res, { once: true })
         );
-        startSegment();
-        setInterval(startSegment, 25000);
+        startAudioPipeline();
       } catch (err) {
         alert('Microphone access denied: ' + err.message);
       }
