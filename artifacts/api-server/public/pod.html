@@ -473,6 +473,58 @@
     letter-spacing: .05em;
   }
 
+  /* Correction chat strip */
+  #correction-strip {
+    display: none;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 1.2rem;
+    background: var(--card-bg);
+    border-top: 1px solid var(--card-border);
+  }
+  #correction-strip.visible { display: flex; }
+  #correction-label {
+    font-size: clamp(0.6rem, 0.85vw, 0.7rem);
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--ink-muted);
+    flex-shrink: 0;
+  }
+  #correction-input {
+    flex: 1;
+    background: var(--paper);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(0.82rem, 1.3vw, 1rem);
+    color: var(--ink);
+    outline: none;
+  }
+  #correction-input:focus { border-color: var(--accent); }
+  #correction-send {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.4rem 1rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(0.78rem, 1.1vw, 0.9rem);
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity .15s;
+  }
+  #correction-send:disabled { opacity: .45; cursor: default; }
+  #correction-ack {
+    font-size: clamp(0.7rem, 1vw, 0.85rem);
+    color: var(--accent);
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  #correction-ack.show { opacity: 1; }
+
   /* Ticker */
   #ticker {
     height: var(--ticker-h);
@@ -589,6 +641,12 @@
     </svg>
     <div id="quotes-row"></div>
     <div id="flags-row"></div>
+    <div id="correction-strip">
+      <span id="correction-label">✏ Correct</span>
+      <input id="correction-input" type="text" placeholder="e.g. rename 'AI Tools' to 'Automation'" maxlength="280"/>
+      <span id="correction-ack">✓ Sent</span>
+      <button id="correction-send">Send</button>
+    </div>
     <div id="ticker">
       <!-- quill icon -->
       <svg class="ticker-icon" width="14" height="20" viewBox="0 0 14 20" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">
@@ -850,6 +908,7 @@ window._toggleTheme = function() {
       };
 
       document.getElementById('status-dot').className = 'status-dot recording';
+      document.getElementById('correction-strip').classList.add('visible');
     } catch (err) {
       alert('Audio pipeline error: ' + err.message);
     }
@@ -883,6 +942,33 @@ window._toggleTheme = function() {
       }
     }
   });
+
+  // ── Correction chat strip ────────────────────────────────
+  (function () {
+    const input  = document.getElementById('correction-input');
+    const btn    = document.getElementById('correction-send');
+    const ack    = document.getElementById('correction-ack');
+    let ackTimer = null;
+
+    function sendCorrection() {
+      const text = input.value.trim();
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: 'correction', text }));
+      input.value = '';
+      btn.disabled = true;
+      ack.classList.add('show');
+      clearTimeout(ackTimer);
+      ackTimer = setTimeout(() => {
+        ack.classList.remove('show');
+        btn.disabled = false;
+      }, 2000);
+    }
+
+    btn.addEventListener('click', sendCorrection);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendCorrection();
+    });
+  })();
 
   // ── Render board ─────────────────────────────────────────
   const clusterEls = {};  // id → { card, ul, ideaIds: Set, botIdx }

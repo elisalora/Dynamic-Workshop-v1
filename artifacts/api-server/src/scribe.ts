@@ -17,13 +17,15 @@ import { logger } from "./lib/logger.js";
 const SCRIBE_INTERVAL_MS = 45_000;
 
 const SCRIBE_SYSTEM = `You are a visual scribe assistant for live workshop sessions.
-Given a transcript of recent speech and the current board state, output ONLY a JSON object (no markdown, no prose) in this exact shape:
+Given a transcript of recent speech, optional facilitator corrections, and the current board state, output ONLY a JSON object (no markdown, no prose) in this exact shape:
 {
   "summary": "<one sentence capturing the essence of the conversation>",
   "ops": [
     // Any combination of the following operation types:
     // {"op":"add_cluster","id":"<unique slug>","label":"<short label>"}
     // {"op":"add_idea","cluster":"<cluster_id>","text":"<short idea text>"}
+    // {"op":"rename_cluster","id":"<cluster_id>","label":"<corrected label>"}
+    // {"op":"update_idea","id":"<idea_id>","text":"<corrected text>"}
     // {"op":"link","from":"<cluster_id>","to":"<cluster_id>","kind":"supports"|"tension"}
     // {"op":"quote","text":"<verbatim short quote from transcript>"}
     // {"op":"flag","kind":"open_question"|"assumption"|"action","text":"<text>"}
@@ -38,7 +40,8 @@ RULES (follow strictly):
 - Quotes MUST be verbatim from the transcript. Use them sparingly — only for striking or pivotal phrases.
 - The synthesis op replaces the previous synthesis; use it only when a clear theme emerges.
 - An empty ops array is valid and preferred when nothing meaningful is new.
-- Never invent content not present in the transcript.
+- Never invent content not present in the transcript or corrections.
+- If FACILITATOR CORRECTIONS are present, prioritise acting on them (rename, fix, clarify) before processing new transcript.
 - Output ONLY the JSON — no markdown fences, no explanation.`;
 
 function boardDigest(board: BoardState): string {
@@ -100,6 +103,16 @@ function applyOps(tableId: string, ops: unknown[]): void {
         if (c) c.emphasized = true;
         break;
       }
+      case "rename_cluster": {
+        const c = board.clusters.find((cl) => cl.id === op["id"]);
+        if (c) c.label = op["label"] ?? c.label;
+        break;
+      }
+      case "update_idea": {
+        const idea = board.ideas.find((i) => i.id === op["id"]);
+        if (idea) idea.text = op["text"] ?? idea.text;
+        break;
+      }
       case "synthesis": {
         board.synthesis = op["text"] ?? null;
         // Mark converging status
@@ -110,7 +123,7 @@ function applyOps(tableId: string, ops: unknown[]): void {
   }
 }
 
-async function runScribeForTable(tableId: string): Promise<void> {
+export async function runScribeForTable(tableId: string): Promise<void> {
   const table = tables.get(tableId);
   if (!table || !table.hasNewSpeech) return;
 
@@ -122,7 +135,11 @@ async function runScribeForTable(tableId: string): Promise<void> {
   table.lastScribeAt = Date.now();
 
   const transcriptText = newSegments.map((s) => s.text).join(" ");
-  const userContent = `Table: ${tableId}\nTopic: ${table.topic}\n\nNEW TRANSCRIPT:\n${transcriptText}\n\nCURRENT BOARD STATE:\n${boardDigest(table.board)}`;
+  const correctionBlock = table.corrections.length
+    ? `\n\nFACILITATOR CORRECTIONS:\n${table.corrections.map((c) => `- ${c}`).join("\n")}`
+    : "";
+  table.corrections = []; // flush before await so concurrent runs don't double-apply
+  const userContent = `Table: ${tableId}\nTopic: ${table.topic}\n\nNEW TRANSCRIPT:\n${transcriptText}${correctionBlock}\n\nCURRENT BOARD STATE:\n${boardDigest(table.board)}`;
 
   logger.info({ tableId }, "Running scribe");
 

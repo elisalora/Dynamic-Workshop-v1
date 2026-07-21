@@ -17,6 +17,7 @@ import {
   consoleSnapshot,
 } from "./state.js";
 import { connectDeepgram, sendAudioToDg, disconnectDeepgram } from "./deepgram.js";
+import { runScribeForTable } from "./scribe.js";
 import { persistActiveTable } from "./persist.js";
 import { jsonlLog } from "./jsonl-log.js";
 import { logger } from "./lib/logger.js";
@@ -119,6 +120,20 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
           if (!dgStarted) {
             dgStarted = true;
             connectDeepgram(tableId, sampleRate);
+          }
+          return;
+        }
+        if (msg["type"] === "correction") {
+          const text = String(msg["text"] ?? "").trim();
+          if (text) {
+            const t = getOrCreateTable(tableId);
+            t.corrections.push(text);
+            t.hasNewSpeech = true; // ensure scribe loop picks it up
+            jsonlLog({ kind: "correction", table: tableId, text });
+            // Run scribe immediately so the correction is applied without waiting for the interval
+            runScribeForTable(tableId).catch((err) =>
+              logger.error({ err, tableId }, "Correction scribe error"),
+            );
           }
           return;
         }

@@ -60,6 +60,7 @@ export interface TableState {
   topic: string;
   transcript: TranscriptSegment[];
   newTranscriptSince: number; // index into transcript for next scribe call
+  corrections: string[];      // facilitator clarifications, flushed after each scribe run
   board: BoardState;
   summary: string;
   metrics: TableMetrics;
@@ -214,6 +215,7 @@ export function getOrCreateTable(id: string, topic = ""): TableState {
       topic,
       transcript: [],
       newTranscriptSince: 0,
+      corrections: [],
       board: {
         clusters: [],
         ideas: [],

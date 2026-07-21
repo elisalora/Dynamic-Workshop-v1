@@ -48,9 +48,12 @@ export function connectDeepgram(tableId: string, sampleRate = 48000): void {
     return;
   }
 
-  // Close existing connection if any
+  // Evict any existing connection without triggering its close-handler reconnect.
+  // We do this by removing it from the map *before* calling close(), so the
+  // handler's `dgConnections.get(tableId) === dg` guard fails.
   const existing = dgConnections.get(tableId);
-  if (existing && existing.readyState <= 1 /* CONNECTING|OPEN */) {
+  if (existing) {
+    dgConnections.delete(tableId);
     try { existing.close(); } catch { /* ignore */ }
   }
 
@@ -96,12 +99,15 @@ export function connectDeepgram(tableId: string, sampleRate = 48000): void {
   });
 
   dg.on("close", (code, reason) => {
-    logger.warn({ tableId, code, reason: reason.toString() }, "Deepgram closed — reconnecting");
     if (keepaliveTimer) clearInterval(keepaliveTimer);
-    // Auto-reconnect if pod is still connected
+    // Only reconnect if this connection is still the active one for this table.
+    // If connectDeepgram replaced us, dgConnections already holds the new socket.
+    if (dgConnections.get(tableId) !== (dg as unknown as ClientWs)) return;
+    logger.warn({ tableId, code, reason: reason.toString() }, "Deepgram closed — reconnecting");
     setTimeout(() => {
-      if (dgConnections.has(tableId)) {
-        connectDeepgram(tableId);
+      // Re-check: pod may have disconnected during the delay
+      if (dgConnections.get(tableId) === (dg as unknown as ClientWs)) {
+        connectDeepgram(tableId, sampleRate);
       }
     }, RECONNECT_DELAY_MS);
   });
