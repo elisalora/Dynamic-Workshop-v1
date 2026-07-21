@@ -196,7 +196,7 @@ export async function runScribeForTable(tableId: string): Promise<void> {
       jsonlLog({ kind: "scribe_correction", table: tableId, summary: table.summary });
       persistActiveTable(table);
       sendToPod(tableId, { type: "canvas_state", board: table.board, summary: table.summary });
-      broadcastConsoleState();
+      broadcastConsole(consoleSnapshot());
     } catch (err) {
       logger.error({ err, tableId, raw }, "Correction-only scribe error");
     }

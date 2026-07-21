@@ -812,6 +812,85 @@
   }
   .btn-delete-archived:hover { color: var(--red); background: rgba(248,113,113,0.1); }
 
+  /* ── Search ─────────────────────────────────── */
+  #search-section {
+    margin-bottom: 1.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+  }
+  #search-section .section-title { margin-bottom: 0.65rem; }
+  #search-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  #search-input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.15s;
+    min-width: 0;
+  }
+  #search-input:focus { outline: none; border-color: var(--accent); }
+  #search-input::placeholder { color: var(--muted); }
+  #search-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  #search-btn:hover { opacity: 0.85; }
+  #search-btn:disabled { opacity: 0.5; cursor: default; }
+  #search-result {
+    display: none;
+    margin-top: 0.85rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  #search-result.visible { display: block; }
+  #search-result-meta {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.45rem;
+  }
+  #search-result-text {
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  #search-result-text em {
+    color: var(--accent);
+    font-style: normal;
+    font-weight: 600;
+  }
+  #search-spinner {
+    display: none;
+    margin-top: 0.65rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  #search-spinner.visible { display: block; }
+
   /* ── Candidates ─────────────────────────────── */
   #candidates-section { margin-bottom: 1.75rem; }
   #candidates-list { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -1081,6 +1160,19 @@
 </section>
 
 <!-- ── Spawn Candidates ─────────────────────────── -->
+<section id="search-section">
+  <div class="section-title">Search Discussion</div>
+  <div id="search-row">
+    <input id="search-input" type="text" placeholder="e.g. "what did people say about trust?"" autocomplete="off"/>
+    <button id="search-btn">Search</button>
+  </div>
+  <div id="search-spinner">Searching transcripts…</div>
+  <div id="search-result">
+    <div id="search-result-meta"></div>
+    <div id="search-result-text"></div>
+  </div>
+</section>
+
 <section id="candidates-section">
   <div class="section-header">
     <div class="section-title">Spawn Candidates</div>
@@ -2039,6 +2131,60 @@ window._toggleTheme = function() {
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  // ── Search ─────────────────────────────────────────────
+  (function() {
+    const input   = document.getElementById('search-input');
+    const btn     = document.getElementById('search-btn');
+    const spinner = document.getElementById('search-spinner');
+    const result  = document.getElementById('search-result');
+    const meta    = document.getElementById('search-result-meta');
+    const text    = document.getElementById('search-result-text');
+
+    async function doSearch() {
+      const q = input.value.trim();
+      if (!q) return;
+
+      btn.disabled = true;
+      spinner.classList.add('visible');
+      result.classList.remove('visible');
+
+      try {
+        const base = window._apiBase || '/api';
+        const res = await fetch(`${base}/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Search failed');
+
+        const tables = data.tablesSearched;
+        meta.textContent = tables && tables.length
+          ? `From ${tables.length} table${tables.length > 1 ? 's' : ''}: ${tables.join(', ')}`
+          : 'Synopsis';
+
+        // Highlight quoted phrases in amber
+        text.innerHTML = esc(data.synopsis).replace(
+          /&quot;([^&]+)&quot;/g,
+          '<em>"$1"</em>'
+        );
+        result.classList.add('visible');
+      } catch (err) {
+        meta.textContent = 'Error';
+        text.textContent = err.message || 'Something went wrong.';
+        result.classList.add('visible');
+      } finally {
+        btn.disabled = false;
+        spinner.classList.remove('visible');
+      }
+    }
+
+    btn.addEventListener('click', doSearch);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doSearch();
+    });
+  })();
 
   // ── Boot ───────────────────────────────────────────────
   initAuth();
