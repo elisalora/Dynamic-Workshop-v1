@@ -420,8 +420,51 @@
     color: var(--muted);
     font-size: 0.78rem;
     font-style: italic;
-    padding: 0.75rem;
+    padding: 0.5rem 0.75rem 0;
   }
+
+  /* ── Inline add-group area inside a session ── */
+  .session-add-group {
+    padding: 0.5rem 0.85rem 0.75rem;
+  }
+  .session-add-group-btn {
+    width: 100%;
+    background: none;
+    border: 1.5px dashed rgba(176,112,16,0.35);
+    border-radius: 7px;
+    padding: 0.48rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.12s, border-color 0.12s;
+    text-align: center;
+  }
+  .session-add-group-btn:hover { background: rgba(176,112,16,0.06); border-color: var(--accent); }
+  .inline-group-form {
+    display: none;
+    margin-top: 0.6rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.85rem 0.9rem 0.75rem;
+    animation: slideDown 0.15s ease-out;
+  }
+  .inline-group-form.open { display: block; }
+  .inline-group-form .form-label { font-size: 0.68rem; }
+  .inline-group-form .form-input { font-size: 0.85rem; margin-bottom: 0; }
+  .inline-group-qs { margin-top: 0.55rem; display: flex; flex-direction: column; gap: 0.35rem; }
+  .inline-add-q {
+    background: none; border: none; color: var(--muted); font-size: 0.75rem;
+    cursor: pointer; padding: 0.15rem 0; font-family: inherit; text-align: left;
+    margin-top: 0.25rem;
+  }
+  .inline-add-q:hover { color: var(--accent); }
+  .inline-form-actions { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.65rem; }
+  .inline-form-actions .btn-create { font-size: 0.78rem; padding: 0.35rem 0.85rem; }
+  .inline-form-actions .btn-cancel { font-size: 0.78rem; padding: 0.35rem 0.6rem; }
+  .inline-form-error { font-size: 0.73rem; color: var(--red); flex: 1; }
   .session-summary-bar {
     display: flex;
     align-items: center;
@@ -1654,7 +1697,21 @@ window._toggleTheme = function() {
             <span class="sum-date">${formatRelative(s.summaryGeneratedAt)}</span>
           </div>` : ''}
         <div class="session-tables" id="st-${esc(s.id)}"></div>
-        ${sTables.length === 0 ? '<div class="session-empty">No groups assigned — use the Session dropdown on any group card.</div>' : ''}
+        ${sTables.length === 0 ? '<div class="session-empty">No groups yet — add one below.</div>' : ''}
+        <div class="session-add-group">
+          <button class="session-add-group-btn" data-action="open-inline-group" data-sesid="${esc(s.id)}">＋ Add Group to this session</button>
+          <div class="inline-group-form" id="igf-${esc(s.id)}">
+            <div class="form-label">Group name</div>
+            <input class="form-input inline-name-input" type="text" placeholder="e.g. Table 3, Future of Work…" autocomplete="off"/>
+            <div class="inline-group-qs" id="igq-${esc(s.id)}"></div>
+            <button class="inline-add-q" data-action="inline-add-q" data-sesid="${esc(s.id)}">＋ Add a discussion question</button>
+            <div class="inline-form-actions">
+              <button class="btn-create inline-create-btn" data-action="inline-create-group" data-sesid="${esc(s.id)}">Create &amp; get link</button>
+              <button class="btn-cancel inline-cancel-btn" data-action="close-inline-group" data-sesid="${esc(s.id)}">Cancel</button>
+              <span class="inline-form-error" id="ige-${esc(s.id)}"></span>
+            </div>
+          </div>
+        </div>
       </div>`;
 
     const tablesEl = folder.querySelector(`#st-${s.id}`);
@@ -1686,6 +1743,69 @@ window._toggleTheme = function() {
         if (confirm(`Delete session "${sesname}"? Groups will become unassigned.`)) {
           apiFetch(`/sessions/${sesid}`, 'DELETE');
         }
+        return;
+      }
+      if (action === 'open-inline-group') {
+        const igf = folder.querySelector(`#igf-${sesid}`);
+        igf.classList.toggle('open');
+        if (igf.classList.contains('open')) {
+          igf.querySelector('.inline-name-input').focus();
+        }
+        return;
+      }
+      if (action === 'close-inline-group') {
+        const igf = folder.querySelector(`#igf-${sesid}`);
+        igf.classList.remove('open');
+        igf.querySelector('.inline-name-input').value = '';
+        const qContainer = folder.querySelector(`#igq-${sesid}`);
+        if (qContainer) qContainer.innerHTML = '';
+        const errEl = folder.querySelector(`#ige-${sesid}`);
+        if (errEl) errEl.textContent = '';
+        return;
+      }
+      if (action === 'inline-add-q') {
+        const qContainer = folder.querySelector(`#igq-${sesid}`);
+        const row = document.createElement('div');
+        row.className = 'question-row';
+        row.innerHTML = `<input class="form-input" type="text" placeholder="e.g. What assumptions are we making?" autocomplete="off"/><button class="btn-remove-q" title="Remove">✕</button>`;
+        row.querySelector('.btn-remove-q').addEventListener('click', () => row.remove());
+        qContainer.appendChild(row);
+        row.querySelector('input').focus();
+        return;
+      }
+      if (action === 'inline-create-group') {
+        const igf   = folder.querySelector(`#igf-${sesid}`);
+        const nameI = igf.querySelector('.inline-name-input');
+        const errEl = folder.querySelector(`#ige-${sesid}`);
+        const createBtn = igf.querySelector('.inline-create-btn');
+        const name  = nameI.value.trim();
+        if (!name) { errEl.textContent = 'Please enter a group name.'; nameI.focus(); return; }
+        const questions = Array.from(igf.querySelectorAll('#igq-' + sesid + ' input'))
+          .map(i => i.value.trim()).filter(Boolean);
+        createBtn.disabled = true;
+        createBtn.textContent = 'Creating…';
+        errEl.textContent = '';
+        (async () => {
+          try {
+            const res = await fetch(`${base}/groups`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, questions }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const group = await res.json();
+            await apiFetch(`/sessions/${sesid}/assign/${group.tableId}`);
+            igf.classList.remove('open');
+            nameI.value = '';
+            igf.querySelector(`#igq-${sesid}`) && (igf.querySelector(`#igq-${sesid}`).innerHTML = '');
+            renderWaitingCard(group, document.getElementById('waiting-list'), true);
+          } catch (e) {
+            errEl.textContent = 'Failed: ' + e.message;
+          } finally {
+            createBtn.disabled = false;
+            createBtn.textContent = 'Create & get link';
+          }
+        })();
         return;
       }
     };
