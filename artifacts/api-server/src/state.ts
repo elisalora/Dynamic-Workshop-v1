@@ -83,11 +83,27 @@ export interface ThemeCandidate {
 
 // ── In-memory store ──────────────────────────────────────────────────────────
 
+export interface AppUser {
+  clerkUserId: string;
+  email: string;
+  displayName: string;
+  role: "admin" | "facilitator";
+  createdAt: number;
+}
+
+export const appUsers = new Map<string, AppUser>();
+
+export interface ConsoleClient {
+  userId: string | null;
+  isAdmin: boolean;
+}
+
 export interface SessionConfig {
   tableId: string;
   name: string;
   questions: string[];
   createdAt: number;
+  ownerId?: string;
 }
 
 /**
@@ -102,6 +118,7 @@ export interface Session {
   createdAt: number;
   summary?: string;
   summaryGeneratedAt?: number;
+  ownerId?: string;
 }
 
 /**
@@ -114,6 +131,7 @@ export interface Workshop {
   sessionIds: string[];
   createdAt: number;
   logoUrl?: string;
+  ownerId?: string;
 }
 
 export const tables = new Map<string, TableState>();
@@ -205,7 +223,7 @@ export function unarchiveTable(tableId: string): void {
 
 // WebSocket client registry
 export const podSockets = new Map<string, WebSocket>(); // tableId → ws
-export const consoleSockets = new Set<WebSocket>();
+export const consoleSockets = new Map<WebSocket, ConsoleClient>(); // ws → client info
 export const boardSockets = new Set<WebSocket>();
 
 export function getOrCreateTable(id: string, topic = ""): TableState {
@@ -243,10 +261,11 @@ export function getOrCreateTable(id: string, topic = ""): TableState {
   return tables.get(id)!;
 }
 
-export function broadcastConsole(msg: unknown): void {
-  const data = JSON.stringify(msg);
-  for (const ws of consoleSockets) {
-    if (ws.readyState === 1 /* OPEN */) ws.send(data);
+/** Broadcast a per-user filtered snapshot to every connected console client. */
+export function broadcastConsole(): void {
+  for (const [ws, client] of consoleSockets) {
+    if (ws.readyState !== 1 /* OPEN */) continue;
+    ws.send(JSON.stringify(consoleSnapshot(client.userId, client.isAdmin)));
   }
 }
 
@@ -262,34 +281,67 @@ export function sendToPod(tableId: string, msg: unknown): void {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
-export function consoleSnapshot() {
-  const tableArr = Array.from(tables.values()).map((t) => {
-    const cfg = sessionConfigs.get(t.id);
-    // Find which session this table belongs to
-    let sessionId: string | null = null;
-    for (const s of sessions.values()) {
-      if (s.tableIds.includes(t.id)) { sessionId = s.id; break; }
-    }
-    return {
-      id: t.id,
-      topic: t.topic,
-      name: cfg?.name ?? t.topic ?? t.id,
-      questions: cfg?.questions ?? [],
-      summary: t.summary,
-      metrics: t.metrics,
-      board: t.board,
-      sessionId,
-    };
-  });
+/**
+ * Build a console snapshot filtered to what `userId` is allowed to see.
+ * Admin users (isAdmin=true) see everything. Non-admins see only entities
+ * they own plus unowned entities that appear in their visible workshops.
+ */
+export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
+  const canSee = (ownerId?: string) =>
+    isAdmin || !ownerId || ownerId === userId;
 
-  // Groups created but pod not yet connected
-  const waitingArr = Array.from(sessionConfigs.values())
-    .filter((s) => !tables.has(s.tableId))
-    .map((s) => ({
-      tableId: s.tableId,
-      name: s.name,
-      questions: s.questions,
-      createdAt: s.createdAt,
+  // ── Workshops visible to this user ───────────────────────────────────────
+  const visibleWorkshops = Array.from(workshops.values()).filter((w) => canSee(w.ownerId));
+  const visibleWorkshopIds = new Set(visibleWorkshops.map((w) => w.id));
+
+  // ── Sessions visible: owned by user OR nested inside a visible workshop ──
+  const visibleSessions = Array.from(sessions.values()).filter(
+    (s) => canSee(s.ownerId) || (s.workshopId != null && visibleWorkshopIds.has(s.workshopId)),
+  );
+  const visibleSessionIds = new Set(visibleSessions.map((s) => s.id));
+
+  // ── Table IDs reachable through visible sessions ──────────────────────────
+  const visibleTableIds = new Set(visibleSessions.flatMap((s) => s.tableIds));
+
+  // ── Session configs (waiting groups) owned by user ───────────────────────
+  const visibleConfigs = Array.from(sessionConfigs.values()).filter((c) =>
+    canSee(c.ownerId),
+  );
+  const visibleConfigIds = new Set(visibleConfigs.map((c) => c.tableId));
+
+  // A table is visible if it's in a visible session OR its config is visible
+  const effectiveVisibleTableIds = new Set([
+    ...visibleTableIds,
+    ...Array.from(tables.keys()).filter((id) => visibleConfigIds.has(id)),
+  ]);
+
+  const tableArr = Array.from(tables.entries())
+    .filter(([id]) => effectiveVisibleTableIds.has(id))
+    .map(([, t]) => {
+      const cfg = sessionConfigs.get(t.id);
+      let sessionId: string | null = null;
+      for (const s of visibleSessions) {
+        if (s.tableIds.includes(t.id)) { sessionId = s.id; break; }
+      }
+      return {
+        id: t.id,
+        topic: t.topic,
+        name: cfg?.name ?? t.topic ?? t.id,
+        questions: cfg?.questions ?? [],
+        summary: t.summary,
+        metrics: t.metrics,
+        board: t.board,
+        sessionId,
+      };
+    });
+
+  const waitingArr = visibleConfigs
+    .filter((c) => !tables.has(c.tableId))
+    .map((c) => ({
+      tableId: c.tableId,
+      name: c.name,
+      questions: c.questions,
+      createdAt: c.createdAt,
     }));
 
   const candidateArr = Array.from(themeCandidates.values()).sort((a, b) => {
@@ -297,7 +349,7 @@ export function consoleSnapshot() {
     return (order[a.state] ?? 9) - (order[b.state] ?? 9);
   });
 
-  const sessionArr = Array.from(sessions.values()).map((s) => ({
+  const sessionArr = visibleSessions.map((s) => ({
     id: s.id,
     name: s.name,
     workshopId: s.workshopId ?? null,
@@ -307,7 +359,7 @@ export function consoleSnapshot() {
     summaryGeneratedAt: s.summaryGeneratedAt ?? null,
   }));
 
-  const workshopArr = Array.from(workshops.values()).map((w) => ({
+  const workshopArr = visibleWorkshops.map((w) => ({
     id: w.id,
     name: w.name,
     sessionIds: w.sessionIds,
@@ -315,16 +367,21 @@ export function consoleSnapshot() {
     logoUrl: w.logoUrl ?? null,
   }));
 
-  const archivedArr = Array.from(archivedTables.values()).map((t) => {
-    const cfg = sessionConfigs.get(t.id);
-    return {
-      id: t.id,
-      topic: t.topic,
-      name: cfg?.name ?? t.topic ?? t.id,
-      summary: t.summary,
-      board: t.board,
-    };
-  });
+  const archivedArr = Array.from(archivedTables.values())
+    .filter((t) => {
+      const cfg = sessionConfigs.get(t.id);
+      return canSee(cfg?.ownerId);
+    })
+    .map((t) => {
+      const cfg = sessionConfigs.get(t.id);
+      return {
+        id: t.id,
+        topic: t.topic,
+        name: cfg?.name ?? t.topic ?? t.id,
+        summary: t.summary,
+        board: t.board,
+      };
+    });
 
   return {
     type: "state",

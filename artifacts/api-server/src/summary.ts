@@ -4,7 +4,6 @@ import {
   tables,
   archivedTables,
   broadcastConsole,
-  consoleSnapshot,
   type TableState,
 } from "./state.js";
 import { persistSession } from "./persist.js";
@@ -78,7 +77,7 @@ Write a structured report with exactly these sections (use ## headings):
   session.summary = cleaned;
   session.summaryGeneratedAt = Date.now();
   persistSession(session);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
 
   logger.info({ sessionId }, "Session summary complete");
   return cleaned;

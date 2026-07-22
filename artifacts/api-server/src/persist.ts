@@ -22,6 +22,8 @@ import {
   sessionConfigs,
   sessions,
   workshops,
+  appUsers,
+  type AppUser,
   type Workshop,
   type Session,
   type SessionConfig,
@@ -134,6 +136,17 @@ export async function ensureSchema(): Promise<void> {
     ALTER TABLE active_tables ADD COLUMN IF NOT EXISTS write_seq BIGINT NOT NULL DEFAULT 0;
     -- Add logo_url to workshops for databases created before this column existed
     ALTER TABLE workshops ADD COLUMN IF NOT EXISTS logo_url TEXT;
+    -- Multi-tenancy: owner tracking
+    ALTER TABLE workshops      ADD COLUMN IF NOT EXISTS owner_id TEXT;
+    ALTER TABLE sessions       ADD COLUMN IF NOT EXISTS owner_id TEXT;
+    ALTER TABLE session_configs ADD COLUMN IF NOT EXISTS owner_id TEXT;
+    CREATE TABLE IF NOT EXISTS users (
+      clerk_user_id TEXT    PRIMARY KEY,
+      email         TEXT    NOT NULL,
+      display_name  TEXT,
+      role          TEXT    NOT NULL DEFAULT 'facilitator',
+      created_at    BIGINT  NOT NULL
+    );
   `);
   logger.info("Database schema verified / created");
 }
@@ -144,13 +157,25 @@ export async function ensureSchema(): Promise<void> {
 export async function hydrateFromDb(): Promise<void> {
   const pool = getPool();
 
-  const [wsRes, sessRes, cfgRes, activeRes, archivedRes] = await Promise.all([
+  const [wsRes, sessRes, cfgRes, activeRes, archivedRes, usersRes] = await Promise.all([
     pool.query("SELECT * FROM workshops ORDER BY created_at"),
     pool.query("SELECT * FROM sessions ORDER BY created_at"),
     pool.query("SELECT * FROM session_configs ORDER BY created_at"),
     pool.query("SELECT * FROM active_tables"),
     pool.query("SELECT * FROM archived_tables"),
+    pool.query("SELECT * FROM users ORDER BY created_at"),
   ]);
+
+  for (const row of usersRes.rows) {
+    const u: AppUser = {
+      clerkUserId: row.clerk_user_id,
+      email: row.email,
+      displayName: row.display_name ?? row.email,
+      role: row.role as "admin" | "facilitator",
+      createdAt: Number(row.created_at),
+    };
+    appUsers.set(u.clerkUserId, u);
+  }
 
   for (const row of wsRes.rows) {
     const w: Workshop = {
@@ -159,6 +184,7 @@ export async function hydrateFromDb(): Promise<void> {
       sessionIds: row.session_ids as string[],
       createdAt: Number(row.created_at),
       logoUrl: row.logo_url ?? undefined,
+      ownerId: row.owner_id ?? undefined,
     };
     workshops.set(w.id, w);
   }
@@ -172,6 +198,7 @@ export async function hydrateFromDb(): Promise<void> {
       createdAt: Number(row.created_at),
       summary: row.summary ?? undefined,
       summaryGeneratedAt: row.summary_generated_at ? Number(row.summary_generated_at) : undefined,
+      ownerId: row.owner_id ?? undefined,
     };
     sessions.set(s.id, s);
   }
@@ -182,6 +209,7 @@ export async function hydrateFromDb(): Promise<void> {
       name: row.name,
       questions: row.questions as string[],
       createdAt: Number(row.created_at),
+      ownerId: row.owner_id ?? undefined,
     };
     sessionConfigs.set(c.tableId, c);
   }
@@ -237,19 +265,21 @@ export async function hydrateFromDb(): Promise<void> {
 // ── Workshops ────────────────────────────────────────────────────────────────
 
 export function persistWorkshop(w: Workshop): void {
-  // Snapshot mutable fields now so late-binding doesn't pick up a different version
   const id = w.id;
   const name = w.name;
   const sessionIds = JSON.stringify(w.sessionIds);
   const createdAt = w.createdAt;
   const logoUrl = w.logoUrl ?? null;
+  const ownerId = w.ownerId ?? null;
 
   enqueue(`workshop:${id}`, () =>
     getPool().query(
-      `INSERT INTO workshops (id, name, session_ids, created_at, logo_url)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, session_ids = EXCLUDED.session_ids, logo_url = EXCLUDED.logo_url`,
-      [id, name, sessionIds, createdAt, logoUrl],
+      `INSERT INTO workshops (id, name, session_ids, created_at, logo_url, owner_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name, session_ids = EXCLUDED.session_ids,
+         logo_url = EXCLUDED.logo_url, owner_id = EXCLUDED.owner_id`,
+      [id, name, sessionIds, createdAt, logoUrl, ownerId],
     ).then(() => undefined),
   );
 }
@@ -270,18 +300,20 @@ export function persistSession(s: Session): void {
   const createdAt = s.createdAt;
   const summary = s.summary ?? null;
   const summaryGeneratedAt = s.summaryGeneratedAt ?? null;
+  const ownerId = s.ownerId ?? null;
 
   enqueue(`session:${id}`, () =>
     getPool().query(
-      `INSERT INTO sessions (id, name, workshop_id, table_ids, created_at, summary, summary_generated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO sessions (id, name, workshop_id, table_ids, created_at, summary, summary_generated_at, owner_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO UPDATE SET
          name                 = EXCLUDED.name,
          workshop_id          = EXCLUDED.workshop_id,
          table_ids            = EXCLUDED.table_ids,
          summary              = EXCLUDED.summary,
-         summary_generated_at = EXCLUDED.summary_generated_at`,
-      [id, name, workshopId, tableIds, createdAt, summary, summaryGeneratedAt],
+         summary_generated_at = EXCLUDED.summary_generated_at,
+         owner_id             = EXCLUDED.owner_id`,
+      [id, name, workshopId, tableIds, createdAt, summary, summaryGeneratedAt, ownerId],
     ).then(() => undefined),
   );
 }
@@ -299,13 +331,15 @@ export function persistSessionConfig(c: SessionConfig): void {
   const name = c.name;
   const questions = JSON.stringify(c.questions);
   const createdAt = c.createdAt;
+  const ownerId = c.ownerId ?? null;
 
   enqueue(`session_config:${tableId}`, () =>
     getPool().query(
-      `INSERT INTO session_configs (table_id, name, questions, created_at)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (table_id) DO UPDATE SET name = EXCLUDED.name, questions = EXCLUDED.questions`,
-      [tableId, name, questions, createdAt],
+      `INSERT INTO session_configs (table_id, name, questions, created_at, owner_id)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (table_id) DO UPDATE SET
+         name = EXCLUDED.name, questions = EXCLUDED.questions, owner_id = EXCLUDED.owner_id`,
+      [tableId, name, questions, createdAt, ownerId],
     ).then(() => undefined),
   );
 }
@@ -402,4 +436,34 @@ export function deleteArchivedTable(id: string): void {
   enqueue(`archived_table:${id}`, () =>
     getPool().query("DELETE FROM archived_tables WHERE id = $1", [id]).then(() => undefined),
   );
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+export async function upsertUser(u: AppUser): Promise<void> {
+  await getPool().query(
+    `INSERT INTO users (clerk_user_id, email, display_name, role, created_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (clerk_user_id) DO UPDATE SET
+       email        = EXCLUDED.email,
+       display_name = EXCLUDED.display_name,
+       role         = EXCLUDED.role`,
+    [u.clerkUserId, u.email, u.displayName, u.role, u.createdAt],
+  );
+}
+
+export async function updateUserRole(clerkUserId: string, role: string): Promise<void> {
+  await getPool().query(
+    `UPDATE users SET role = $2 WHERE clerk_user_id = $1`,
+    [clerkUserId, role],
+  );
+}
+
+/** Assign all currently unowned workshops/sessions/session_configs to userId. */
+export async function claimUnownedData(userId: string): Promise<void> {
+  await Promise.all([
+    getPool().query(`UPDATE workshops       SET owner_id = $1 WHERE owner_id IS NULL`, [userId]),
+    getPool().query(`UPDATE sessions        SET owner_id = $1 WHERE owner_id IS NULL`, [userId]),
+    getPool().query(`UPDATE session_configs SET owner_id = $1 WHERE owner_id IS NULL`, [userId]),
+  ]);
 }

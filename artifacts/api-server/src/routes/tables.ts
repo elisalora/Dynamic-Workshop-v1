@@ -6,7 +6,6 @@ import {
   archiveTable,
   unarchiveTable,
   broadcastConsole,
-  consoleSnapshot,
 } from "../state.js";
 import { deleteSessionConfig, deleteArchivedTable } from "../persist.js";
 
@@ -20,7 +19,7 @@ router.post("/:tableId/archive", (req, res) => {
     return;
   }
   archiveTable(tableId);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 
@@ -32,25 +31,22 @@ router.post("/:tableId/unarchive", (req, res) => {
     return;
   }
   unarchiveTable(tableId);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 
 // Delete a waiting session or archived table entirely
 router.delete("/:tableId", (req, res) => {
   const { tableId } = req.params as { tableId: string };
-  // Remove from session configs (waiting sessions)
   if (sessionConfigs.has(tableId)) {
     sessionConfigs.delete(tableId);
     deleteSessionConfig(tableId);
   }
-  // Remove from archived tables
   if (archivedTables.has(tableId)) {
     archivedTables.delete(tableId);
     deleteArchivedTable(tableId);
   }
-  // Do not allow deleting live active tables — archive first
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 

@@ -1,10 +1,10 @@
 import { Router } from "express";
+import { getAuth } from "@clerk/express";
 import {
   sessions,
   workshops,
   createSession,
   broadcastConsole,
-  consoleSnapshot,
 } from "../state.js";
 import { persistSession, deleteSession, persistWorkshop } from "../persist.js";
 import { generateSessionSummary } from "../summary.js";
@@ -14,13 +14,15 @@ const router = Router();
 
 // Create session (optionally nested under a workshop)
 router.post("/sessions", (req, res) => {
+  const { userId } = getAuth(req);
   const { name, workshopId } = req.body as { name?: string; workshopId?: string };
   if (!name?.trim()) {
     res.status(400).json({ error: "name required" });
     return;
   }
   const s = createSession(name.trim(), workshopId || undefined);
-  broadcastConsole(consoleSnapshot());
+  if (userId) { s.ownerId = userId; persistSession(s); }
+  broadcastConsole();
   res.json(s);
 });
 
@@ -31,7 +33,7 @@ router.patch("/sessions/:id", (req, res) => {
   const { name } = req.body as { name?: string };
   if (name?.trim()) s.name = name.trim();
   persistSession(s);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json(s);
 });
 
@@ -42,7 +44,6 @@ router.delete("/sessions/:id", (req, res) => {
   if (!s) { res.status(404).json({ error: "not found" }); return; }
   sessions.delete(id);
   deleteSession(id);
-  // Remove from parent workshop's sessionIds list
   if (s.workshopId) {
     const w = workshops.get(s.workshopId);
     if (w) {
@@ -51,7 +52,7 @@ router.delete("/sessions/:id", (req, res) => {
       persistWorkshop(w);
     }
   }
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 
@@ -60,17 +61,13 @@ router.post("/sessions/:id/assign/:tableId", (req, res) => {
   const s = sessions.get(req.params["id"]!);
   if (!s) { res.status(404).json({ error: "session not found" }); return; }
   const { tableId } = req.params as { tableId: string };
-  // Remove from any other session first
   for (const other of sessions.values()) {
     const idx = other.tableIds.indexOf(tableId);
-    if (idx !== -1) {
-      other.tableIds.splice(idx, 1);
-      persistSession(other);
-    }
+    if (idx !== -1) { other.tableIds.splice(idx, 1); persistSession(other); }
   }
   if (!s.tableIds.includes(tableId)) s.tableIds.push(tableId);
   persistSession(s);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 
@@ -81,7 +78,7 @@ router.post("/sessions/:id/unassign/:tableId", (req, res) => {
   const idx = s.tableIds.indexOf(req.params["tableId"]!);
   if (idx !== -1) s.tableIds.splice(idx, 1);
   persistSession(s);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 

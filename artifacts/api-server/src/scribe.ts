@@ -3,7 +3,6 @@ import {
   tables,
   broadcastConsole,
   sendToPod,
-  consoleSnapshot,
   type BoardState,
   type Cluster,
   type Idea,
@@ -196,7 +195,7 @@ export async function runScribeForTable(tableId: string): Promise<void> {
       jsonlLog({ kind: "scribe_correction", table: tableId, summary: table.summary });
       persistActiveTable(table);
       sendToPod(tableId, { type: "canvas_state", board: table.board, summary: table.summary });
-      broadcastConsole(consoleSnapshot());
+      broadcastConsole();
     } catch (err) {
       logger.error({ err, tableId, raw }, "Correction-only scribe error");
     }
@@ -250,7 +249,7 @@ export async function runScribeForTable(tableId: string): Promise<void> {
     sendToPod(tableId, { type: "canvas_state", board: table.board, summary: table.summary });
 
     // Broadcast updated console state
-    broadcastConsole(consoleSnapshot());
+    broadcastConsole();
   } catch (err) {
     logger.error({ err, tableId, raw: raw.slice(0, 200) }, "Scribe error");
   }

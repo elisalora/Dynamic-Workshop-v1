@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin — Scribe Pilot</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --surface: #141414; --border: #2a2a2a;
+    --text: #e8e0d0; --muted: #888; --amber: #f0b429;
+    --red: #e53e3e; --green: #38a169;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 1rem;
+  }
+  header h1 { font-size: 1rem; letter-spacing: 0.1em; color: var(--amber); }
+  header a { color: var(--muted); text-decoration: none; font-size: 0.8rem; }
+  header a:hover { color: var(--text); }
+  main { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+  h2 { font-size: 0.9rem; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 1rem; text-transform: uppercase; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.25rem; margin-bottom: 1.5rem;
+  }
+  .card p { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { text-align: left; color: var(--muted); font-weight: normal; padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); letter-spacing: 0.05em; }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .role-badge {
+    display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px;
+    font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .role-admin { background: rgba(240,180,41,0.15); color: var(--amber); border: 1px solid rgba(240,180,41,0.3); }
+  .role-facilitator { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+  button.btn {
+    padding: 0.3rem 0.65rem; border-radius: 4px; font-family: inherit;
+    font-size: 0.75rem; letter-spacing: 0.05em; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    transition: background 0.15s;
+  }
+  button.btn:hover { background: rgba(240,180,41,0.1); border-color: var(--amber); }
+  button.btn-danger { color: var(--red); }
+  button.btn-danger:hover { background: rgba(229,62,62,0.1); border-color: var(--red); }
+  .action-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .notice {
+    padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.82rem;
+    background: rgba(240,180,41,0.08); border: 1px solid rgba(240,180,41,0.3);
+    color: var(--amber); margin-bottom: 1rem;
+  }
+  .notice.red { background: rgba(229,62,62,0.08); border-color: rgba(229,62,62,0.3); color: var(--red); }
+  .notice.green { background: rgba(56,161,105,0.08); border-color: rgba(56,161,105,0.3); color: var(--green); }
+  #auth-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; z-index: 999;
+  }
+  #auth-overlay p { color: var(--muted); font-size: 0.85rem; }
+  #auth-overlay.hidden { display: none; }
+  .spinner { width: 1.5rem; height: 1.5rem; border: 2px solid var(--border); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .stat { font-size: 0.75rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div id="auth-overlay">
+  <div class="spinner"></div>
+  <p id="auth-status">Loading authentication…</p>
+</div>
+
+<header>
+  <h1>⚙ ADMIN</h1>
+  <a href="console.html">← Console</a>
+</header>
+
+<main id="main-content" style="display:none">
+
+  <div class="card" id="claim-card">
+    <h2>Unowned Data</h2>
+    <p>Workshops, sessions and groups created before multi-tenancy was enabled have no owner. Use the button below to claim them all under your account.</p>
+    <div class="action-row">
+      <button class="btn" onclick="claimData()">⬇ Claim all unowned data</button>
+    </div>
+    <div id="claim-result"></div>
+  </div>
+
+  <div class="card">
+    <h2>Users</h2>
+    <p>All facilitators who have signed into Scribe Pilot.</p>
+    <div id="users-notice"></div>
+    <table id="users-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Workshops</th>
+          <th>Sessions</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="users-body">
+        <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:1.5rem">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<script>
+  const base = (() => {
+    const p = location.pathname;
+    const idx = p.indexOf('/admin.html');
+    return idx !== -1 ? p.slice(0, idx) : '';
+  })();
+
+  let _clerk = null;
+  let _myEmail = '';
+  const ADMIN_EMAILS = ['elisabeth@alora.tech'];
+
+  async function initAuth() {
+    try {
+      const cfg = await fetch(`${base}/auth/config`).then(r => r.json());
+      if (!cfg.publishableKey) {
+        // No auth configured — allow access
+        document.getElementById('auth-overlay').classList.add('hidden');
+        document.getElementById('main-content').style.display = '';
+        loadUsers();
+        return;
+      }
+
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@4/dist/clerk.browser.js';
+        s.crossOrigin = 'anonymous';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+
+      const ClerkCtor = typeof window.Clerk === 'function' ? window.Clerk : window.Clerk?.Clerk;
+      if (!ClerkCtor) throw new Error('Clerk not available');
+      const clerk = new ClerkCtor(cfg.publishableKey);
+      await clerk.load();
+      _clerk = clerk;
+
+      if (!clerk.user) {
+        document.getElementById('auth-status').textContent = 'Access denied — sign in as an admin first.';
+        return;
+      }
+
+      const email = clerk.user.primaryEmailAddress?.emailAddress || '';
+      _myEmail = email;
+
+      if (!ADMIN_EMAILS.includes(email.toLowerCase())) {
+        document.getElementById('auth-status').textContent = `Access denied — ${email} is not an admin.`;
+        return;
+      }
+
+      // Register this user as admin
+      await fetch(`${base}/users/me`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          displayName: clerk.user.fullName || email,
+        }),
+      });
+
+      document.getElementById('auth-overlay').classList.add('hidden');
+      document.getElementById('main-content').style.display = '';
+      loadUsers();
+    } catch (err) {
+      console.error('Admin auth error:', err);
+      document.getElementById('auth-status').textContent = `Auth error: ${err.message}`;
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const users = await fetch(`${base}/admin/users`).then(r => {
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        return r.json();
+      });
+
+      const tbody = document.getElementById('users-body');
+      if (!users.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:1.5rem">No users yet</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td>${esc(u.displayName)}</td>
+          <td>${esc(u.email)}</td>
+          <td><span class="role-badge role-${u.role}">${u.role}</span></td>
+          <td class="stat">${u.workshopCount}</td>
+          <td class="stat">${u.sessionCount}</td>
+          <td>
+            ${u.role === 'facilitator'
+              ? `<button class="btn" onclick="setRole('${esc(u.clerkUserId)}', 'admin')">Make admin</button>`
+              : u.email !== _myEmail
+                ? `<button class="btn btn-danger" onclick="setRole('${esc(u.clerkUserId)}', 'facilitator')">Revoke admin</button>`
+                : '<span class="stat">you</span>'}
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      document.getElementById('users-notice').innerHTML =
+        `<div class="notice red">Failed to load users: ${esc(err.message)}</div>`;
+    }
+  }
+
+  async function setRole(userId, role) {
+    try {
+      await fetch(`${base}/admin/users/${encodeURIComponent(userId)}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      loadUsers();
+    } catch (err) {
+      alert(`Failed to update role: ${err.message}`);
+    }
+  }
+
+  async function claimData() {
+    const el = document.getElementById('claim-result');
+    el.innerHTML = '<div class="notice">Claiming unowned data…</div>';
+    try {
+      const res = await fetch(`${base}/admin/claim-data`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        el.innerHTML = `<div class="notice green">Done — ${data.claimed} record(s) claimed.</div>`;
+      } else {
+        el.innerHTML = `<div class="notice red">Error: ${esc(data.error)}</div>`;
+      }
+    } catch (err) {
+      el.innerHTML = `<div class="notice red">Failed: ${esc(err.message)}</div>`;
+    }
+  }
+
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  initAuth();
+</script>
+</body>
+</html>

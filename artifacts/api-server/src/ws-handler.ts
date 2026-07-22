@@ -7,6 +7,7 @@ import {
   sessionConfigs,
   sessions,
   workshops,
+  appUsers,
   podSockets,
   consoleSockets,
   boardSockets,
@@ -16,6 +17,8 @@ import {
   broadcastBoard,
   consoleSnapshot,
 } from "./state.js";
+import { upsertUser } from "./persist.js";
+import { ADMIN_EMAILS } from "./middlewares/auth.js";
 import { connectDeepgram, sendAudioToDg, disconnectDeepgram } from "./deepgram.js";
 import { runScribeForTable } from "./scribe.js";
 import { persistActiveTable } from "./persist.js";
@@ -95,7 +98,7 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
   }));
 
   // Broadcast updated console
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
 
   // Connect Deepgram lazily — only when the pod sends a start_audio message
   // (which includes the browser's actual AudioContext sample rate).
@@ -158,7 +161,7 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
     logger.info({ tableId }, "Pod disconnected");
     podSockets.delete(tableId);
     disconnectDeepgram(tableId);
-    broadcastConsole(consoleSnapshot());
+    broadcastConsole();
   });
 
   ws.on("error", (err) => logger.error({ err, tableId }, "Pod WS error"));
@@ -168,14 +171,46 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
 
 function handleConsole(ws: WebSocket): void {
   logger.info("Console connected");
-  consoleSockets.add(ws);
+  // Start unidentified — no data until the browser sends an identify message
+  const client = { userId: null as string | null, isAdmin: false };
+  consoleSockets.set(ws, client);
 
-  // Send current state immediately
-  ws.send(JSON.stringify(consoleSnapshot()));
+  // Send empty loading state immediately; real data comes after identify
+  ws.send(JSON.stringify({ type: "state", tables: [], waitingSessions: [], candidates: [], sessions: [], workshops: [], archivedTables: [], identifying: true }));
 
   ws.on("message", (data) => {
     try {
       const msg = JSON.parse(data.toString()) as Record<string, unknown>;
+
+      // ── Identity handshake ─────────────────────────────────────────────────
+      if (msg["type"] === "identify") {
+        const userId = String(msg["userId"] ?? "").trim();
+        const email = String(msg["email"] ?? "").trim();
+        const displayName = String(msg["displayName"] ?? email).trim();
+        if (!userId || !email) return;
+
+        const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+        client.userId = userId;
+        client.isAdmin = isAdmin;
+
+        // Upsert in memory + DB
+        let user = appUsers.get(userId);
+        if (!user) {
+          user = { clerkUserId: userId, email, displayName, role: isAdmin ? "admin" : "facilitator", createdAt: Date.now() };
+          appUsers.set(userId, user);
+        } else {
+          if (isAdmin && user.role !== "admin") user.role = "admin";
+          user.email = email;
+          user.displayName = displayName;
+        }
+        upsertUser(user).catch(() => {});
+
+        logger.info({ userId, isAdmin }, "Console identified");
+        // Send this user's filtered snapshot
+        ws.send(JSON.stringify(consoleSnapshot(userId, isAdmin)));
+        return;
+      }
+
       const candidateId = String(msg["candidateId"] ?? "");
 
       if (msg["type"] === "reveal" || msg["type"] === "reveal_custom") {
@@ -190,13 +225,13 @@ function handleConsole(ws: WebSocket): void {
         jsonlLog({ kind: "reveal", candidateId, text });
 
         broadcastBoard({ type: "reveal", text, prompts: candidate.seedPrompts });
-        broadcastConsole(consoleSnapshot());
+        broadcastConsole();
       } else if (msg["type"] === "dismiss") {
         const candidate = themeCandidates.get(candidateId);
         if (!candidate) return;
         candidate.state = "dismissed";
         jsonlLog({ kind: "dismiss", candidateId });
-        broadcastConsole(consoleSnapshot());
+        broadcastConsole();
       }
     } catch (err) {
       logger.error({ err }, "Console message error");

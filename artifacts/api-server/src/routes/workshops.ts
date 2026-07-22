@@ -1,10 +1,10 @@
 import { Router } from "express";
+import { getAuth } from "@clerk/express";
 import {
   workshops,
   sessions,
   createWorkshop,
   broadcastConsole,
-  consoleSnapshot,
 } from "../state.js";
 import {
   persistWorkshop,
@@ -16,13 +16,16 @@ const router = Router();
 
 // Create a top-level workshop event
 router.post("/workshops", (req, res) => {
+  const { userId } = getAuth(req);
   const { name, logoUrl } = req.body as { name?: string; logoUrl?: string };
   if (!name?.trim()) {
     res.status(400).json({ error: "name required" });
     return;
   }
   const w = createWorkshop(name.trim(), logoUrl?.trim() || undefined);
-  broadcastConsole(consoleSnapshot());
+  if (userId) w.ownerId = userId;
+  persistWorkshop(w);
+  broadcastConsole();
   res.json(w);
 });
 
@@ -34,7 +37,7 @@ router.patch("/workshops/:id", (req, res) => {
   if (name?.trim()) w.name = name.trim();
   if (logoUrl !== undefined) w.logoUrl = logoUrl.trim() || undefined;
   persistWorkshop(w);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json(w);
 });
 
@@ -42,7 +45,6 @@ router.patch("/workshops/:id", (req, res) => {
 router.delete("/workshops/:id", (req, res) => {
   const id = req.params["id"]!;
   if (!workshops.has(id)) { res.status(404).json({ error: "not found" }); return; }
-  // Detach all sessions from this workshop
   for (const s of sessions.values()) {
     if (s.workshopId === id) {
       s.workshopId = undefined;
@@ -51,7 +53,7 @@ router.delete("/workshops/:id", (req, res) => {
   }
   workshops.delete(id);
   deleteWorkshop(id);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 
@@ -61,7 +63,6 @@ router.post("/workshops/:id/add-session/:sessionId", (req, res) => {
   if (!w) { res.status(404).json({ error: "workshop not found" }); return; }
   const s = sessions.get(req.params["sessionId"]!);
   if (!s) { res.status(404).json({ error: "session not found" }); return; }
-  // Remove session from old workshop if it had one
   if (s.workshopId && s.workshopId !== w.id) {
     const old = workshops.get(s.workshopId);
     if (old) {
@@ -74,7 +75,7 @@ router.post("/workshops/:id/add-session/:sessionId", (req, res) => {
   if (!w.sessionIds.includes(s.id)) w.sessionIds.push(s.id);
   persistWorkshop(w);
   persistSession(s);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 
@@ -90,7 +91,7 @@ router.post("/workshops/:id/remove-session/:sessionId", (req, res) => {
   const idx = w.sessionIds.indexOf(req.params["sessionId"]!);
   if (idx !== -1) w.sessionIds.splice(idx, 1);
   persistWorkshop(w);
-  broadcastConsole(consoleSnapshot());
+  broadcastConsole();
   res.json({ ok: true });
 });
 

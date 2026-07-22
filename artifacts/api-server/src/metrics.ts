@@ -1,4 +1,4 @@
-import { tables, broadcastConsole, consoleSnapshot } from "./state.js";
+import { tables, broadcastConsole } from "./state.js";
 import { persistActiveTable } from "./persist.js";
 import { logger } from "./lib/logger.js";
 
@@ -127,6 +127,6 @@ export function startMetricsLoop(): void {
         logger.error({ err, tableId }, "Metrics error");
       }
     }
-    broadcastConsole(consoleSnapshot());
+    broadcastConsole();
   }, METRICS_INTERVAL_MS);
 }

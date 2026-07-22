@@ -1,1 +1,2 @@
 - [Clerk CDN in screenshot sandbox](clerk-cdn-screenshot.md) — CDN always fails in screenshot tool; auth fallback is intentional, not a bug.
+- [Multi-tenancy ownership model](multitenancy-model.md) — owner_id on workshops/sessions/session_configs; console WS uses identify handshake; admin page at admin.html.

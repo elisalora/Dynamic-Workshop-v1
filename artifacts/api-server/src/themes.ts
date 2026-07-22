@@ -3,7 +3,6 @@ import {
   tables,
   themeCandidates,
   broadcastConsole,
-  consoleSnapshot,
   type ThemeCandidate,
 } from "./state.js";
 import { jsonlLog } from "./jsonl-log.js";
@@ -93,7 +92,7 @@ export async function runThemePass(): Promise<void> {
       }
     }
 
-    broadcastConsole(consoleSnapshot());
+    broadcastConsole();
   } catch (err) {
     logger.error({ err, raw: raw.slice(0, 200) }, "Theme pass error");
   }
