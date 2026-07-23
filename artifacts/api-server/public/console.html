@@ -1349,7 +1349,37 @@ window._toggleTheme = function() {
       if (!ClerkCtor) throw new Error('Clerk CDN did not expose a constructor');
 
       const clerk = new ClerkCtor(publishableKey);
-      await clerk.load();
+
+      // clerk.load() can throw if the browser holds a stale session token
+      // (e.g. from a previous dev instance with different keys). In that case,
+      // clear Clerk's local storage and reload so the user lands on a clean
+      // sign-in screen instead of seeing a permanent error.
+      try {
+        await clerk.load();
+      } catch (loadErr) {
+        console.warn('clerk.load() failed (likely stale session) — clearing and reloading', loadErr);
+        // Wipe Clerk's IndexedDB / localStorage entries then reload
+        try {
+          const dbs = await indexedDB.databases?.();
+          if (dbs) {
+            for (const db of dbs) {
+              if (db.name) indexedDB.deleteDatabase(db.name);
+            }
+          }
+        } catch (_) { /* ignore */ }
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('clerk') || key.includes('__clerk')) localStorage.removeItem(key);
+        }
+        document.cookie.split(';').forEach(c => {
+          const name = c.trim().split('=')[0];
+          if (name.startsWith('__clerk') || name.startsWith('__session') || name.startsWith('__client')) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+          }
+        });
+        location.reload();
+        return;
+      }
+
       _clerkInstance = clerk;
 
       if (!clerk.user) {
