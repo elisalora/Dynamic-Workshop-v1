@@ -1342,18 +1342,17 @@ window._toggleTheme = function() {
         document.head.appendChild(s);
       });
 
-      // Handle both v4 (window.Clerk = class) and v5 (window.Clerk = {Clerk: class})
-      const ClerkCtor = typeof window.Clerk === 'function'
-        ? window.Clerk
-        : window.Clerk?.Clerk;
-      if (!ClerkCtor) throw new Error('Clerk CDN did not expose a constructor');
-
-      const clerk = new ClerkCtor(publishableKey);
+      // Clerk's CDN build pre-instantiates window.Clerk — it is NOT a constructor.
+      // Call window.Clerk.load({ publishableKey }) directly.
+      if (!window.Clerk || typeof window.Clerk.load !== 'function') {
+        throw new Error('Clerk CDN did not expose a load() method (window.Clerk=' + typeof window.Clerk + ')');
+      }
+      const clerk = window.Clerk;
 
       // clerk.load() can throw if the browser holds a stale session token.
       // Clear Clerk's storage and reload once — sessionStorage flag prevents loops.
       try {
-        await clerk.load();
+        await clerk.load({ publishableKey });
       } catch (loadErr) {
         console.warn('clerk.load() failed:', loadErr);
         if (!sessionStorage.getItem('clerk_cleared')) {

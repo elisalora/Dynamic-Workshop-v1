@@ -6,9 +6,11 @@ import { fileURLToPath } from "node:url";
 import { logger } from "./lib/logger.js";
 import router from "./routes/index.js";
 import { clerkMiddleware } from "@clerk/express";
+import { publishableKeyFromHost } from "@clerk/shared/keys";
 import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
+  getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -38,13 +40,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Clerk session middleware — resolves auth from cookies on every request
-// Use the raw publishable key directly; host-derived keys cause token mismatches
-// when the Replit proxy rewrites the host header.
 app.use(
-  clerkMiddleware({
-    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY,
-  }),
+  clerkMiddleware((req) => ({
+    publishableKey: publishableKeyFromHost(
+      getClerkProxyHost(req) ?? "",
+      process.env.CLERK_PUBLISHABLE_KEY,
+    ),
+  })),
 );
 
 // Expose publishable key to the browser (public, no auth required)
