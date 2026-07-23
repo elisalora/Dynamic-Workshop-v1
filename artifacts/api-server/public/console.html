@@ -1350,35 +1350,35 @@ window._toggleTheme = function() {
 
       const clerk = new ClerkCtor(publishableKey);
 
-      // clerk.load() can throw if the browser holds a stale session token
-      // (e.g. from a previous dev instance with different keys). In that case,
-      // clear Clerk's local storage and reload so the user lands on a clean
-      // sign-in screen instead of seeing a permanent error.
+      // clerk.load() can throw if the browser holds a stale session token.
+      // Clear Clerk's storage and reload once — sessionStorage flag prevents loops.
       try {
         await clerk.load();
       } catch (loadErr) {
-        console.warn('clerk.load() failed (likely stale session) — clearing and reloading', loadErr);
-        // Wipe Clerk's IndexedDB / localStorage entries then reload
-        try {
-          const dbs = await indexedDB.databases?.();
-          if (dbs) {
-            for (const db of dbs) {
-              if (db.name) indexedDB.deleteDatabase(db.name);
+        console.warn('clerk.load() failed:', loadErr);
+        if (!sessionStorage.getItem('clerk_cleared')) {
+          sessionStorage.setItem('clerk_cleared', '1');
+          // Wipe Clerk's IndexedDB / localStorage / cookies then reload
+          try {
+            const dbs = await indexedDB.databases?.();
+            if (dbs) for (const db of dbs) if (db.name) indexedDB.deleteDatabase(db.name);
+          } catch (_) { /* ignore */ }
+          for (const key of Object.keys(localStorage)) {
+            if (key.startsWith('clerk') || key.includes('__clerk')) localStorage.removeItem(key);
+          }
+          document.cookie.split(';').forEach(c => {
+            const name = c.trim().split('=')[0];
+            if (name.startsWith('__clerk') || name.startsWith('__session') || name.startsWith('__client')) {
+              document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
             }
-          }
-        } catch (_) { /* ignore */ }
-        for (const key of Object.keys(localStorage)) {
-          if (key.startsWith('clerk') || key.includes('__clerk')) localStorage.removeItem(key);
+          });
+          location.reload();
+          return;
         }
-        document.cookie.split(';').forEach(c => {
-          const name = c.trim().split('=')[0];
-          if (name.startsWith('__clerk') || name.startsWith('__session') || name.startsWith('__client')) {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-          }
-        });
-        location.reload();
-        return;
+        // Second failure after clearing — fall through to catch block (show error)
+        throw loadErr;
       }
+      sessionStorage.removeItem('clerk_cleared'); // successful load — reset flag
 
       _clerkInstance = clerk;
 
@@ -1421,8 +1421,9 @@ window._toggleTheme = function() {
 
     } catch (err) {
       console.error('Auth init failed:', err);
-      // Fail closed — never grant access if auth is broken
-      document.getElementById('auth-loading').textContent = 'Sign-in unavailable. Please refresh or contact support.';
+      // Fail closed — show the actual error so it can be diagnosed
+      const msg = (err instanceof Error ? err.message : String(err)) || 'Unknown error';
+      document.getElementById('auth-loading').textContent = `Sign-in error: ${msg}`;
     }
   }
 
