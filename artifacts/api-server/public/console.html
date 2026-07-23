@@ -1332,18 +1332,23 @@ window._toggleTheme = function() {
         return;
       }
 
-      // Load Clerk JS from CDN (pinned to v4 — stable window.Clerk constructor shape)
+      // Derive the Clerk Frontend API (FAPI) domain from the publishable key.
+      // pk_test_<base64(domain + '$')> → decode → "subtle-toad-78.clerk.accounts.dev"
+      // Load clerk.browser.js from the FAPI domain — this is the URL Clerk officially
+      // supports for vanilla-JS usage; it sets window.Clerk automatically.
+      const b64 = publishableKey.replace(/^pk_(test|live)_/, '');
+      const fapiDomain = atob(b64).replace(/\$$/, '');
+      const clerkScriptUrl = `https://${fapiDomain}/npm/@clerk/clerk-js@latest/dist/clerk.browser.js`;
+
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@4/dist/clerk.browser.js';
-        s.crossOrigin = 'anonymous';
+        s.src = clerkScriptUrl;
+        s.setAttribute('data-clerk-publishable-key', publishableKey);
         s.onload = resolve;
         s.onerror = reject;
         document.head.appendChild(s);
       });
 
-      // Clerk's CDN build pre-instantiates window.Clerk — it is NOT a constructor.
-      // Call window.Clerk.load({ publishableKey }) directly.
       if (!window.Clerk || typeof window.Clerk.load !== 'function') {
         throw new Error('Clerk CDN did not expose a load() method (window.Clerk=' + typeof window.Clerk + ')');
       }
