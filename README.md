@@ -8,6 +8,8 @@ The room writes its own agenda, live.
 
 ![The split-flap board revealing a cross-table theme](attached_assets/Screenshot_2026-07-21_at_2.00.48_PM_1784667651853.png)
 
+> **About to facilitate rather than read the code?** Go straight to **[GUIDES/RUNNING_A_WORKSHOP.md](GUIDES/RUNNING_A_WORKSHOP.md)** — one page, no code, everything you need to run a session.
+
 ---
 
 ## The loop
@@ -162,14 +164,16 @@ Every transcript line, scribe op, theme pass, reveal and dismiss is appended to 
 
 ## Status
 
-A working pilot. Authentication and tenant isolation are enforced server-side: every mutating route is behind `requireAuth` with an ownership check, the console socket takes a server-minted ticket, and pod and board sockets require their capability keys. `/healthz` and `/api/report/<sessionId>` are the two deliberate exceptions — the report link is meant to be shareable with attendees who have no account, and it exposes the generated summary only.
+A working pilot. Authentication and tenant isolation are enforced server-side: every mutating route is behind `requireAuth` with an ownership check, the console socket takes a server-minted ticket, and pod and board sockets require their capability keys. `/healthz` and `/api/report/<sessionId>` are the deliberate exceptions — the report link is meant to be shareable with attendees who have no account, and it exposes the generated summary only.
+
+The HTML pages themselves are served publicly, and `console.html`'s sign-in overlay is presentation rather than a security boundary. Anyone can load the console page; nobody can get data out of it without a ticket. That is the stronger guarantee, and it is the one to rely on.
 
 Theme passes and reveals are scoped to a session, so concurrent workshops on one instance no longer bleed into each other.
 
 Three things to know before pointing it at a real event:
 
-- **The scribe and the ASR have never run end to end.** Everything else is covered — auth paths, persistence, migrations, snapshot isolation, schema-enforced scribe output — but no one has yet watched a real Deepgram transcript drive a real scribe cycle against this code. The first live session proves that path.
+- **The scribe and the ASR have never run end to end.** ⏳ Everything else is covered — auth paths, persistence, migrations, snapshot isolation, schema-enforced scribe output — but no one has yet watched a real Deepgram transcript drive a real scribe cycle against this code. The first live session proves that path. *Delete this bullet once a workshop has actually run; the same claim appears in [GUIDES/RUNNING_A_WORKSHOP.md](GUIDES/RUNNING_A_WORKSHOP.md) and goes at the same time.*
 - **One facilitator per workshop.** There is no sharing or team concept. A second facilitator signing in gets their own empty console; they cannot see or co-run someone else's session. Participants at tables need no account, which is the shape the product is actually built for.
 - **Keys do not rotate.** Anyone holding a pod link can join that table, and anyone holding a board link can watch that session's reveals, until the group or session is deleted.
 
-See `replit.md` for operational notes and gotchas.
+See `replit.md` for operational notes and gotchas, and **[GUIDES/RUNNING_A_WORKSHOP.md](GUIDES/RUNNING_A_WORKSHOP.md)** if you are about to facilitate rather than to read the code.

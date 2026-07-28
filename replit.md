@@ -127,6 +127,7 @@ Every transcript line, scribe op, theme pass, reveal and dismiss is appended to 
 - Clerk's CDN reliably fails inside the screenshot tool; the auth fallback you see there is intentional, not a bug
 - `persistActiveTable()` deliberately does **not** write the transcript. Speech is appended to `transcript_segments` one row at a time; the `active_tables` row carries board, metrics and summary, which change on the 45s/60s loop rather than per utterance
 - `themeCandidates` is keyed by `candidateKey(sessionId, topic)` and scoped per session throughout — the pass, the console snapshot and the board broadcast. It is still never pruned within a session
+- **If transcripts are missing that should be there, suspect the backfill marker.** On the boot that introduces `schema_migrations`, the code infers whether the PR #3 transcript backfill already ran by checking whether `transcript_segments`' sequence has been used. A backfill that threw mid-INSERT looks identical to one that finished and later had rows deleted, because a failed INSERT advances the identity sequence just the same. It resolves that ambiguity toward "already migrated", because the other reading resurrects speech someone deleted on purpose. The boot log warns when it makes this call and reports `strandedTranscripts` — tables whose speech is still only in the legacy JSONB column. **0 is the ordinary answer on a migrated database; a high count means the backfill probably never finished.** Recovery: delete the `transcripts_to_segments` row from `schema_migrations` and restart. `migrations.test.ts` pins this behaviour
 
 ## Split-Flap Board Constraints
 
@@ -161,7 +162,8 @@ Two call shapes, and the difference matters:
 
 Enforced server-side as of PR #3, tightened by #7 and #9. `.agents/memory/multitenancy-model.md` describes the older read-side-only design and is superseded on the write side and the handshake.
 
-- Every mutating REST route is behind `requireAuth` plus an `ownsEntity` check. The only routes without `requireAuth` are `GET /healthz` and `GET /api/report/:id`, both deliberate.
+- Every mutating REST route is behind `requireAuth` plus an `ownsEntity` check. Within `routes/`, the only handlers without `requireAuth` are `GET /healthz` and `GET /api/report/:id`, both deliberate.
+- **The pages are public; the data behind them is not.** Two things sit outside the `/api` router and are also unauthenticated: `GET /api/auth/config` (`app.ts`), which returns the Clerk *publishable* key — public by definition — and the static files themselves. `console.html`'s sign-in overlay is presentation, not a security boundary; a comment in `app.ts` says so. Anyone can fetch the console page. What they cannot do is get a snapshot out of it, because the socket wants a server-minted ticket. State the property that way round — protecting the page would be the weaker guarantee.
 - `GET /api/report/:id` is public on the session ID so a write-up can be shared with attendees who have no account. It renders the summary only. PR #9 exists because the board socket used to accept that same session ID as its credential, which turned a forwarded report link into a live feed of reveals — hence a separate `boardKey`.
 - The console socket takes a single-use ticket (60s expiry) from `POST /api/ws-ticket`, not a client-asserted identity.
 - Admin is by email in `ADMIN_EMAILS` (`middlewares/auth.ts`), server-side authoritative. `elisabeth@alora.tech` is the only entry. Pre-auth records have a null `owner_id` and are admin-only until claimed via **claim unowned data** in `admin.html`.
