@@ -42,11 +42,15 @@ Everything is served under the `/api/` path prefix. `/` redirects to the console
 
 | URL | Who it's for |
 |-----|--------------|
-| `/api/pod.html?table=T1&topic=...` | **The table.** Mic capture and the live scribe board. Warm paper/ink, large type, readable from three metres. |
-| `/api/pod.html?table=T1&demo=1` | **Demo mode.** Scripted fake transcript, no mic needed — runs the whole pipeline end to end. |
-| `/api/console.html` | **The facilitator.** Table status, sparklines, one-line AI summaries, theme candidates with evidence, and reveal/dismiss controls. Phone-friendly. |
-| `/api/board.html` | **The room.** 6×22 split-flap display. Reveals flip in column by column with synthesised clicks. Light by default, dark theme toggle. |
+| `/api/console.html` | **The facilitator.** Workshops and sessions, table status, sparklines, one-line AI summaries, theme candidates with evidence, and reveal/dismiss controls. Phone-friendly. Requires sign-in — everything else starts here. |
+| `/api/pod.html?table=<id>&key=<joinKey>` | **The table.** Mic capture and the live scribe board. Warm paper/ink, large type, readable from three metres. Participants need no account. |
+| `/api/board.html?session=<id>&key=<boardKey>` | **The room.** 6×22 split-flap display. Reveals flip in column by column with synthesised clicks. Light by default, dark theme toggle. |
 | `/api/admin.html` | **The owner.** User list, role toggles, and a one-off "claim unowned data" action. |
+| `/api/report/<sessionId>` | **Everyone else.** The session write-up, readable with no account. Summary only — never transcripts, boards, or theme evidence. |
+
+**Do not hand-write pod or board URLs.** Both carry a capability key minted when the group or session was created, and both sockets refuse a connection without it. Copy the pod link from the group's **Copy link** button and open the board from the session's **▦ Board** button. A bare `pod.html?table=T1` closes immediately with `Unknown table`.
+
+Add `&demo=1` to a copied pod link for demo mode: a scripted transcript every five seconds, no microphone needed. The group still has to exist.
 
 ## Stack
 
@@ -72,14 +76,17 @@ artifacts/
       persist.ts        — Postgres read/write, per-entity write queue
       ws-handler.ts     — WebSocket role routing (pod / console / board)
       deepgram.ts       — per-table live ASR bridge
-      anthropic.ts      — Claude client
+      anthropic.ts      — Claude client (SDK, retries, schema-enforced JSON)
+      ws-auth.ts        — single-use console tickets, capability key compare
+      users.ts          — resolve a Clerk user to an AppUser + role
       scribe.ts         — 45s scribe loop + op application
       metrics.ts        — 60s WPM / novelty / status loop
-      themes.ts         — 180s cross-table theme engine
+      themes.ts         — 180s per-session theme engine
       summary.ts        — end-of-session Markdown report
       jsonl-log.ts      — append-only event log
-      routes/           — workshops, sessions, groups, tables, search, admin, health
+      routes/           — workshops, sessions, groups, tables, search, admin, ws, health
       middlewares/      — Clerk auth guards, Clerk CDN proxy
+      *.test.ts         — persist, migrations, snapshot isolation, scribe schema
     public/             — pod.html, console.html, board.html, admin.html
   mockup-sandbox/       — Vite/React UI sandbox (not part of the running app)
   facilitator-mobile/   — Expo client (early)
@@ -98,11 +105,13 @@ Tables can be archived and unarchived; archived tables still feed search and ses
 
 Connections carry a `?role=` query param.
 
-| Role | In | Out |
-|------|-----|-----|
-| `pod&table=ID` | `start_audio` (sample rate), binary linear16 PCM chunks, `correction`, `demo_transcript` | `canvas_state` (full board + summary), `tick` (live transcript line) |
-| `console` | `identify`, `reveal`, `reveal_custom`, `dismiss` | filtered state snapshots |
-| `board` | — | `reveal` (text + seed prompts) |
+| Role | Credential | In | Out |
+|------|-----------|-----|-----|
+| `pod&table=<id>&key=<joinKey>` | the group's join key | `start_audio` (sample rate), binary linear16 PCM chunks, `correction`, `demo_transcript` | `canvas_state` (full board + summary), `tick` (live transcript line) |
+| `console&ticket=<t>` | a single-use ticket from `POST /api/ws-ticket` | `reveal`, `reveal_custom`, `dismiss` | filtered state snapshots |
+| `board&session=<id>&key=<boardKey>` | the session's board key | — | `reveal` (text + seed prompts), for that session only |
+
+Each role proves itself differently, and none of them takes the client's word for who it is. The console ticket is minted behind `requireAuth`, so the user ID is server-established rather than asserted in the payload. Pod and board keys are capability checks rather than identity checks — participants are not Clerk users, and the goal is that knowing a table ID does not let you join a room or inject speech into someone else's transcript.
 
 The pod captures audio through an `AudioContext` and streams raw linear16 PCM rather than a webm container — Deepgram decodes it unambiguously, and there is no container header to lose on reconnect. The pod announces its actual sample rate in `start_audio` before the first chunk, and the server opens the Deepgram socket lazily at that point. Deepgram auto-reconnects on close and is kept alive every 5 seconds.
 
@@ -133,19 +142,19 @@ On Replit the **API Server** workflow starts it automatically and assigns `PORT`
 | `CLERK_SECRET_KEY` | yes | Server-side session verification |
 | `LOG_LEVEL` | no | Pino level |
 | `NODE_ENV` | no | `development` enables pretty logs |
+| `ANTHROPIC_MODEL` | no | Overrides the default model without a redeploy |
 
-Want to see it work without a microphone or a room full of people? Open two pods in demo mode and the console:
+### Seeing it work without a microphone
 
-```
-/api/pod.html?table=T1&topic=Trust&demo=1
-/api/pod.html?table=T2&topic=Speed&demo=1
-/api/console.html
-```
+Everything starts in the console — you cannot conjure a table by typing a URL.
 
-Open the board from the console's **▦ Board** button rather than by typing the URL:
-it carries the session's board key, and the board is refused without it.
+1. Open `/api/console.html` and sign in.
+2. **⊟ New Session** — the session is the unit the board and the theme engine work on.
+3. **＋ New Group**, twice. In each, set the **Session** dropdown to the session you just made. It defaults to *— No session —*, and a group with no session gets no board and never feeds a theme.
+4. **Copy link** on each group, append `&demo=1` to the copied URL, and open both. Each pod now feeds a scripted transcript line every five seconds.
+5. **▦ Board** on the session to put the display up.
 
-The theme engine needs at least two tables before it will run at all.
+Give it about four minutes: two scribe passes per table at 45s, then the first theme pass at 180s. **The theme engine needs at least two live tables in the same session** — with one table it does not run at all.
 
 ## Logging
 
@@ -153,9 +162,14 @@ Every transcript line, scribe op, theme pass, reveal and dismiss is appended to 
 
 ## Status
 
-This is a working pilot, not a hardened product. Two things to know before pointing it at a real event:
+A working pilot. Authentication and tenant isolation are enforced server-side: every mutating route is behind `requireAuth` with an ownership check, the console socket takes a server-minted ticket, and pod and board sockets require their capability keys. `/healthz` and `/api/report/<sessionId>` are the two deliberate exceptions — the report link is meant to be shareable with attendees who have no account, and it exposes the generated summary only.
 
-- **Access control is not yet enforced server-side.** Ownership (`owner_id`) is recorded and the console snapshot filters on it, but most REST routes and the WebSocket handshake do not verify the caller. Do not expose a public deployment holding real participant data until that lands.
-- **Theme candidates and reveals are process-global.** Two facilitators running concurrent workshops on one instance will see each other's themes. One workshop per instance for now.
+Theme passes and reveals are scoped to a session, so concurrent workshops on one instance no longer bleed into each other.
 
-Both are known and tracked. See `replit.md` for operational notes and gotchas.
+Three things to know before pointing it at a real event:
+
+- **The scribe and the ASR have never run end to end.** Everything else is covered — auth paths, persistence, migrations, snapshot isolation, schema-enforced scribe output — but no one has yet watched a real Deepgram transcript drive a real scribe cycle against this code. The first live session proves that path.
+- **One facilitator per workshop.** There is no sharing or team concept. A second facilitator signing in gets their own empty console; they cannot see or co-run someone else's session. Participants at tables need no account, which is the shape the product is actually built for.
+- **Keys do not rotate.** Anyone holding a pod link can join that table, and anyone holding a board link can watch that session's reveals, until the group or session is deleted.
+
+See `replit.md` for operational notes and gotchas.
