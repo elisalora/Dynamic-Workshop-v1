@@ -95,6 +95,7 @@ const session: Session = {
   createdAt: 1_700_000_001_000,
   summary: "A compelling synthesis of the morning's discussions.",
   summaryGeneratedAt: 1_700_000_002_000,
+  boardKey: "test-board-key-do-not-reuse",
 };
 
 const sessionConfig: SessionConfig = {
@@ -518,6 +519,7 @@ describe("persist → hydrateFromDb round-trip", () => {
 
 const LEGACY_ID = "TEST_LEGACY";
 const ADMIN_ID = "TEST_ADMIN_USER";
+const KEYLESS_SESSION = "TEST_NOKEY_SESS";
 
 /**
  * Wait for writes that state.ts triggered on our behalf.
@@ -558,11 +560,51 @@ describe("post-review regressions", () => {
       await pool.query("DELETE FROM transcript_segments WHERE table_id = $1", [LEGACY_ID]);
       await pool.query("DELETE FROM active_tables WHERE id = $1", [LEGACY_ID]);
       await pool.query("DELETE FROM users WHERE clerk_user_id = $1", [ADMIN_ID]);
+      await pool.query("DELETE FROM sessions WHERE id = $1", [KEYLESS_SESSION]);
     } finally {
       await pool.end();
     }
     tables.delete(LEGACY_ID);
     appUsers.delete(ADMIN_ID);
+  });
+
+  /**
+   * Sessions predate the board socket having any credential at all, so their
+   * rows have a NULL board_key. A board with no key can never open, so hydration
+   * mints one — the same thing it already does for a group with no join key.
+   */
+  it("mints a board key for a session that predates it, and writes it back", async () => {
+    const pool = new pg.Pool({ connectionString: process.env["DATABASE_URL"] });
+    try {
+      await pool.query(
+        `INSERT INTO sessions (id, name, table_ids, created_at)
+         VALUES ($1, 'legacy session', '[]'::jsonb, 1)
+         ON CONFLICT (id) DO UPDATE SET board_key = NULL`,
+        [KEYLESS_SESSION],
+      );
+
+      sessions.delete(KEYLESS_SESSION);
+      await hydrateFromDb();
+
+      const minted = sessions.get(KEYLESS_SESSION)?.boardKey;
+      assert.ok(minted, "a keyless session must not hydrate without a board key");
+      assert.notEqual(minted, KEYLESS_SESSION, "the key must not be the session ID");
+
+      await drainWriteQueue();
+      const { rows } = await pool.query("SELECT board_key FROM sessions WHERE id = $1", [
+        KEYLESS_SESSION,
+      ]);
+      assert.equal(rows[0].board_key, minted, "the minted key has to be written back");
+
+      // Second boot keeps it — otherwise every restart would break the board
+      // link the facilitator had just picked up.
+      sessions.delete(KEYLESS_SESSION);
+      await hydrateFromDb();
+      assert.equal(sessions.get(KEYLESS_SESSION)?.boardKey, minted);
+    } finally {
+      sessions.delete(KEYLESS_SESSION);
+      await pool.end();
+    }
   });
 
   /**

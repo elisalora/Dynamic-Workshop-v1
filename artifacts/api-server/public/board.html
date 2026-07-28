@@ -389,17 +389,24 @@ window._toggleTheme = function() {
   // A board displays one session. Without this it was a wildcard listener, so a
   // reveal in any workshop lit up every connected display.
   const sessionId = new URLSearchParams(location.search).get('session') || '';
+  // The session ID is also the public report URL, so it cannot be the board's
+  // credential. The key comes with the link the console hands out.
+  const boardKey = new URLSearchParams(location.search).get('key') || '';
 
   function connect() {
-    if (!sessionId) {
+    if (!sessionId || !boardKey) {
+      // Naming the missing half matters: an old bookmarked board URL has a
+      // session and no key, and "no session" would send someone hunting for
+      // the wrong thing. Either way the fix is to reopen it from the console.
       document.getElementById('board-status').textContent =
-        'no session — open this board from a session in the facilitator console';
+        (sessionId ? 'no board key' : 'no session') +
+        ' — open this board from a session in the facilitator console';
       return;
     }
 
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const base  = location.pathname.replace(/\/[^/]*$/, '');
-    const ws    = new WebSocket(`${proto}//${location.host}${base}/ws?role=board&session=${encodeURIComponent(sessionId)}`);
+    const ws    = new WebSocket(`${proto}//${location.host}${base}/ws?role=board&session=${encodeURIComponent(sessionId)}&key=${encodeURIComponent(boardKey)}`);
 
     ws.addEventListener('open', () => {
       document.getElementById('board-status').textContent = 'connected · waiting for facilitator…';
@@ -416,11 +423,13 @@ window._toggleTheme = function() {
     });
 
     ws.addEventListener('close', (evt) => {
-      // 1008 means the server does not recognise this session — reconnecting
-      // will keep failing, so stop and say so rather than spin.
+      // 1008 means the server refused this board — unknown session, or a
+      // session whose board key has moved on. Reconnecting will keep failing,
+      // so stop and say which it was rather than spin.
       if (evt.code === 1008) {
         document.getElementById('board-status').textContent =
-          'unknown session — reopen this board from the facilitator console';
+          (evt.reason || 'refused').toLowerCase() +
+          ' — reopen this board from the facilitator console';
         return;
       }
       document.getElementById('board-status').textContent = 'reconnecting…';
