@@ -41,7 +41,7 @@ export function createWss(): WebSocketServer {
         handleConsole(ws, url.searchParams.get("ticket"));
         break;
       case "board":
-        handleBoard(ws, url.searchParams.get("session") ?? "");
+        handleBoard(ws, url.searchParams.get("session") ?? "", url.searchParams.get("key") ?? "");
         break;
       default:
         ws.close(1008, "Unknown role");
@@ -268,14 +268,26 @@ function handleConsole(ws: WebSocket, ticket: string | null): void {
 
 // ── Board ────────────────────────────────────────────────────────────────────
 
-function handleBoard(ws: WebSocket, sessionId: string): void {
+function handleBoard(ws: WebSocket, sessionId: string, boardKey: string): void {
   // A board is a passive display in a specific room, so it binds to one session
-  // and only ever receives that session's reveals. It carries no credential —
-  // it is write-only from the server's side and shows nothing until a
-  // facilitator reveals something — but it must not be a wildcard listener.
-  if (!sessionId || !sessions.has(sessionId)) {
+  // and only ever receives that session's reveals.
+  //
+  // It also has to present that session's board key. Binding to the session was
+  // not enough on its own: `GET /api/report/:id` is deliberately public on the
+  // same ID so a write-up can be shared with attendees who have no account, so
+  // the string that shares the report was also the string that opened the board.
+  // Forwarding a report link handed live reveals to whoever received it — and
+  // "shows nothing until you reveal something" is no mitigation when a reveal is
+  // exactly what you are watching for.
+  const session = sessions.get(sessionId);
+  if (!session) {
     logger.warn({ sessionId }, "Board rejected — unknown session");
     ws.close(1008, "Unknown session");
+    return;
+  }
+  if (!boardKey || !safeEqual(boardKey, session.boardKey)) {
+    logger.warn({ sessionId }, "Board rejected — bad or missing board key");
+    ws.close(1008, "Invalid board key");
     return;
   }
 

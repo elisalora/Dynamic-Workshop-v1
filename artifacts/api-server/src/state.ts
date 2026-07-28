@@ -17,9 +17,14 @@ export function newEntityId(): string {
 }
 
 /**
- * Secret that grants access to a table's pod socket. Handed out as part of the
- * pod link the facilitator shares; never derived from the table ID, so knowing
- * (or guessing) an ID is not enough to join or inject audio.
+ * Secret that grants access to one of the unauthenticated sockets: a table's
+ * pod socket, or a session's board socket. Handed out as part of the link the
+ * facilitator shares; never derived from the ID it accompanies, so knowing (or
+ * guessing) an ID is not enough to join, inject audio, or watch reveals.
+ *
+ * Long-lived by design. These are unattended devices — a pod tablet or a board
+ * display has to survive a page reload three hours into a workshop, so the
+ * single-use 60s ticket the console uses would be the wrong shape here.
  */
 export function newJoinKey(): string {
   return randomBytes(24).toString("base64url");
@@ -152,6 +157,16 @@ export interface Session {
   summary?: string;
   summaryGeneratedAt?: number;
   ownerId?: string;
+  /**
+   * Secret required to open this session's board socket. See newJoinKey().
+   *
+   * Separate from the session ID because the ID is a *public* capability:
+   * `GET /api/report/:id` is deliberately open so a write-up can be shared with
+   * attendees who have no account. Without this key the same string that shares
+   * the report also opens `board.html`, so forwarding the write-up hands live
+   * reveals to whoever receives it, for the rest of the workshop.
+   */
+  boardKey: string;
 }
 
 /**
@@ -201,7 +216,15 @@ export function createGroup(name: string, questions: string[], ownerId?: string)
 /** Create a session (middle tier), optionally nested under a workshop. */
 export function createSession(name: string, workshopId?: string, ownerId?: string): Session {
   const id = newEntityId();
-  const s: Session = { id, name, workshopId, tableIds: [], createdAt: Date.now(), ownerId };
+  const s: Session = {
+    id,
+    name,
+    workshopId,
+    tableIds: [],
+    createdAt: Date.now(),
+    ownerId,
+    boardKey: newJoinKey(),
+  };
   sessions.set(id, s);
   if (workshopId) {
     const w = workshops.get(workshopId);
@@ -452,6 +475,9 @@ export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
     createdAt: s.createdAt,
     summary: s.summary ?? null,
     summaryGeneratedAt: s.summaryGeneratedAt ?? null,
+    // Gated again at the point of emission, the same way the pod join key is.
+    // This is the secret that admits a display to the session's reveals.
+    boardKey: canSee(s.ownerId) ? s.boardKey : null,
   }));
 
   const workshopArr = visibleWorkshops.map((w) => ({

@@ -31,7 +31,7 @@ function workshop(id: string, ownerId?: string): Workshop {
 }
 
 function session(id: string, ownerId: string | undefined, extra: Partial<Session> = {}): Session {
-  return { id, name: id, tableIds: [], createdAt: 1, ownerId, ...extra };
+  return { id, name: id, tableIds: [], createdAt: 1, ownerId, boardKey: `board-key-for-${id}`, ...extra };
 }
 
 function config(tableId: string, ownerId: string | undefined): SessionConfig {
@@ -128,6 +128,24 @@ describe("consoleSnapshot visibility", () => {
     const admin = consoleSnapshot("user_admin", true);
     assert.deepEqual(admin.sessions.map((s) => s.id), ["S1"]);
     assert.deepEqual(admin.tables.map((t) => t.id), ["T1"]);
+  });
+
+  it("emits the board key to the session's owner and never to anyone else", () => {
+    // The board key is the credential that opens a session's reveal display. It
+    // has to reach the owner's console — that is how the board link is built —
+    // and it must not reach an admin snapshot taken on someone else's behalf,
+    // for the same reason the pod join key does not.
+    sessions.set("S1", session("S1", ALICE));
+
+    const alice = consoleSnapshot(ALICE, false);
+    assert.equal(alice.sessions[0]?.boardKey, "board-key-for-S1");
+
+    const bob = consoleSnapshot(BOB, false);
+    assert.deepEqual(bob.sessions, []);
+
+    const admin = consoleSnapshot("user_admin", true);
+    assert.equal(admin.sessions[0]?.id, "S1");
+    assert.equal(admin.sessions[0]?.boardKey, "board-key-for-S1", "admins see everything");
   });
 
   it("returns nothing at all to an unidentified caller", () => {

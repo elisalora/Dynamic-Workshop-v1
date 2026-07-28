@@ -21,7 +21,7 @@ All pages are served under the `/api/` path prefix. `/` redirects to `/api/conso
 | `/api/pod.html?table=T1&topic=...` | Pod scribe board — mic capture + AI visual scribe |
 | `/api/pod.html?table=T1&demo=1` | Demo mode — scripted fake transcript, no mic needed |
 | `/api/console.html` | Facilitator console — workshops, sessions, table status, theme candidates, reveal/dismiss |
-| `/api/board.html` | Split-flap display board — receives reveal messages from facilitator |
+| `/api/board.html?session=S1&key=...` | Split-flap display board — receives reveal messages from facilitator. Open it from the console's ▦ Board button; the key is the session's board key, and the socket is refused without it |
 | `/api/admin.html` | Admin — user list, role toggles, claim unowned data |
 
 All pages default to a light theme with a dark toggle, persisted in `localStorage` under `scribe-theme`.

@@ -161,6 +161,10 @@ export async function ensureSchema(): Promise<void> {
     -- survive the migration; hydrateFromDb() mints one for any row still NULL.
     ALTER TABLE session_configs ADD COLUMN IF NOT EXISTS join_key TEXT;
 
+    -- Board key: the secret in a session's board link. Same story, and the same
+    -- reason it cannot be the session ID — that ID is the public report URL.
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS board_key TEXT;
+
     -- Records which one-shot migrations have run. "Has this migration already
     -- happened" is a fact about the database, not something to re-infer from
     -- the shape of the data every boot — see migrateTranscriptsToSegments.
@@ -558,8 +562,14 @@ export async function hydrateFromDb(): Promise<void> {
       summary: row.summary ?? undefined,
       summaryGeneratedAt: row.summary_generated_at ? Number(row.summary_generated_at) : undefined,
       ownerId: row.owner_id ?? undefined,
+      // Sessions created before the board socket had a credential have no key.
+      // Mint one rather than leave a board nobody can open — the facilitator
+      // picks the new link up from the console, and any board URL already handed
+      // out or left in a display's history stops working, which is the point.
+      boardKey: row.board_key ?? newJoinKey(),
     };
     sessions.set(s.id, s);
+    if (!row.board_key) persistSession(s);
   }
 
   for (const row of cfgRes.rows) {
@@ -684,19 +694,21 @@ export function persistSession(s: Session): void {
   const summary = s.summary ?? null;
   const summaryGeneratedAt = s.summaryGeneratedAt ?? null;
   const ownerId = s.ownerId ?? null;
+  const boardKey = s.boardKey;
 
   enqueue(`session:${id}`, () =>
     getPool().query(
-      `INSERT INTO sessions (id, name, workshop_id, table_ids, created_at, summary, summary_generated_at, owner_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO sessions (id, name, workshop_id, table_ids, created_at, summary, summary_generated_at, owner_id, board_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO UPDATE SET
          name                 = EXCLUDED.name,
          workshop_id          = EXCLUDED.workshop_id,
          table_ids            = EXCLUDED.table_ids,
          summary              = EXCLUDED.summary,
          summary_generated_at = EXCLUDED.summary_generated_at,
-         owner_id             = EXCLUDED.owner_id`,
-      [id, name, workshopId, tableIds, createdAt, summary, summaryGeneratedAt, ownerId],
+         owner_id             = EXCLUDED.owner_id,
+         board_key            = EXCLUDED.board_key`,
+      [id, name, workshopId, tableIds, createdAt, summary, summaryGeneratedAt, ownerId, boardKey],
     ).then(() => undefined),
   );
 }

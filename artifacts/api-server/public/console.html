@@ -1500,7 +1500,7 @@ window._toggleTheme = function() {
   document.getElementById('btn-open-board').addEventListener('click', (e) => {
     e.preventDefault();
     if (currentSessions.length === 1) {
-      window.open(`board.html?session=${encodeURIComponent(currentSessions[0].id)}`, '_blank');
+      window.open(boardUrl(currentSessions[0]), '_blank');
     } else if (currentSessions.length === 0) {
       alert('Create a session first — a board displays one session’s reveals.');
     } else {
@@ -1830,7 +1830,7 @@ window._toggleTheme = function() {
         <span class="session-name">${esc(s.name)}</span>
         <span class="session-count">${sTables.length} group${sTables.length !== 1 ? 's' : ''}</span>
         <div class="session-actions" onclick="event.stopPropagation()">
-          <a class="btn-sm" href="board.html?session=${encodeURIComponent(s.id)}" target="_blank" title="Open the reveal board for this session">▦ Board</a>
+          <a class="btn-sm" href="${esc(boardUrl(s))}" target="_blank" title="Open the reveal board for this session">▦ Board</a>
           ${hasSummary ? `<button class="btn-sm btn-sm-summary" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">✦ Summary</button>` : ''}
           <button class="btn-sm btn-sm-primary" data-action="gen-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">${hasSummary ? '↺' : '✦'}</button>
           <button class="btn-sm" data-action="rename-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Rename</button>
@@ -2397,6 +2397,13 @@ window._toggleTheme = function() {
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // The board link carries the session's board key. The session ID on its own
+  // is not a credential — it is also the public report URL — so a board opened
+  // without the key is refused by the server.
+  function boardUrl(s) {
+    return `board.html?session=${encodeURIComponent(s.id)}&key=${encodeURIComponent(s.boardKey || '')}`;
   }
 
   // ── Search ─────────────────────────────────────────────

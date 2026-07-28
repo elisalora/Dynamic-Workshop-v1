@@ -140,8 +140,10 @@ Want to see it work without a microphone or a room full of people? Open two pods
 /api/pod.html?table=T1&topic=Trust&demo=1
 /api/pod.html?table=T2&topic=Speed&demo=1
 /api/console.html
-/api/board.html
 ```
+
+Open the board from the console's **▦ Board** button rather than by typing the URL:
+it carries the session's board key, and the board is refused without it.
 
 The theme engine needs at least two tables before it will run at all.
 
