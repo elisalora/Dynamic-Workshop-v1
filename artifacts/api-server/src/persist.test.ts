@@ -102,6 +102,7 @@ const activeTable: TableState = {
   },
   lastScribeAt: 1_700_000_026_000,
   hasNewSpeech: true,
+  corrections: [],
   wordBuckets: new Map(),
   allWordsSeen: new Set(),
 };
@@ -131,6 +132,7 @@ const archivedTable: TableState = {
   },
   lastScribeAt: 1_700_000_032_000,
   hasNewSpeech: false,
+  corrections: [],
   wordBuckets: new Map(),
   allWordsSeen: new Set(),
 };
