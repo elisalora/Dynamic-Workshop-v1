@@ -341,12 +341,15 @@ export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
 
   // ── Workshops visible to this user ───────────────────────────────────────
   const visibleWorkshops = Array.from(workshops.values()).filter((w) => canSee(w.ownerId));
-  const visibleWorkshopIds = new Set(visibleWorkshops.map((w) => w.id));
 
-  // ── Sessions visible: owned by user OR nested inside a visible workshop ──
-  const visibleSessions = Array.from(sessions.values()).filter(
-    (s) => canSee(s.ownerId) || (s.workshopId != null && visibleWorkshopIds.has(s.workshopId)),
-  );
+  // ── Sessions visible to this user ────────────────────────────────────────
+  // Ownership is the only test. This used to also admit any session nested in a
+  // visible workshop, without looking at the session's own ownerId — so a
+  // session belonging to someone else, sitting in your workshop, was yours to
+  // read. add-session checks both sides today, which is the only reason that
+  // was unreachable; a session's visibility should not depend on a check that
+  // lives in a route.
+  const visibleSessions = Array.from(sessions.values()).filter((s) => canSee(s.ownerId));
   const visibleSessionIds = new Set(visibleSessions.map((s) => s.id));
 
   // ── Table IDs reachable through visible sessions ──────────────────────────
@@ -358,11 +361,22 @@ export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
   );
   const visibleConfigIds = new Set(visibleConfigs.map((c) => c.tableId));
 
-  // A table is visible if it's in a visible session OR its config is visible
-  const effectiveVisibleTableIds = new Set([
-    ...visibleTableIds,
-    ...Array.from(tables.keys()).filter((id) => visibleConfigIds.has(id)),
-  ]);
+  // A table is reachable if it sits in a visible session or its config is
+  // visible — and, either way, it is only shown if the caller can see the
+  // config that owns it. Session membership alone used to be enough, so a table
+  // reached through a session inherited that session's visibility rather than
+  // being checked on its own; the payload below carries the pod join key, which
+  // makes that a credential handed to whoever the session was shared with.
+  // Nothing routes a table into another owner's session today — assign checks
+  // both sides — but the snapshot should not depend on that being true forever.
+  // archivedTables below already tests the config's own owner; this matches it.
+  const effectiveVisibleTableIds = new Set(
+    Array.from(tables.keys()).filter(
+      (id) =>
+        (visibleTableIds.has(id) || visibleConfigIds.has(id)) &&
+        canSee(sessionConfigs.get(id)?.ownerId),
+    ),
+  );
 
   const tableArr = Array.from(tables.entries())
     .filter(([id]) => effectiveVisibleTableIds.has(id))
@@ -381,7 +395,9 @@ export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
         metrics: t.metrics,
         board: t.board,
         sessionId,
-        joinKey: cfg?.joinKey ?? null,
+        // Gated again at the point of emission rather than relying on the
+        // filter above. This is the secret that admits a pod to the table.
+        joinKey: cfg && canSee(cfg.ownerId) ? cfg.joinKey : null,
       };
     });
 
