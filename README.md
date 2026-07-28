@@ -166,7 +166,7 @@ Every transcript line, scribe op, theme pass, reveal and dismiss is appended to 
 
 A working pilot. Authentication and tenant isolation are enforced server-side: every mutating route is behind `requireAuth` with an ownership check, the console socket takes a server-minted ticket, and pod and board sockets require their capability keys. `/healthz` and `/api/report/<sessionId>` are the deliberate exceptions — the report link is meant to be shareable with attendees who have no account, and it exposes the generated summary only.
 
-The HTML pages themselves are served publicly, and `console.html`'s sign-in overlay is presentation rather than a security boundary. Anyone can load the console page; nobody can get data out of it without a ticket. That is the stronger guarantee, and it is the one to rely on.
+The HTML pages themselves are served publicly, and `console.html`'s sign-in overlay is presentation rather than a security boundary. Anyone can load the console page. Getting data out of it takes a signed-in Clerk session for the REST reads and a server-minted ticket for the live snapshot. That is the stronger guarantee, and it is the one to rely on.
 
 Theme passes and reveals are scoped to a session, so concurrent workshops on one instance no longer bleed into each other.
 
