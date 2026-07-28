@@ -313,7 +313,11 @@ window._toggleTheme = function() {
       if (candidate.length <= COLS) {
         currentRow = candidate;
       } else {
-        rows.push(currentRow);
+        // Only when there is something to push. A word longer than COLS as the
+        // *first* word wraps against an empty currentRow, and that empty string
+        // claims a row of the grid — a blank line above the truncated word, and
+        // the whole block sitting one row low. Six rows is all a Vestaboard has.
+        if (currentRow) rows.push(currentRow);
         currentRow = word;
       }
     }
