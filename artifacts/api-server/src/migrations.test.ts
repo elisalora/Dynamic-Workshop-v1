@@ -151,6 +151,45 @@ describe("ensureSchema upgrade paths", () => {
     assert.deepEqual(await segmentsFor("TBL2"), []);
   });
 
+  it("does not resurrect it when the deleted transcript was the only one", async () => {
+    // Same as above with no TBL9 propping the table up, so transcript_segments
+    // is completely empty. A row test reads that as never-migrated and runs the
+    // backfill; the table has to be judged on its shape and whether it has ever
+    // held a row, not on whether it holds one now.
+    await reset(PRE_PR3 + PR3_SEGMENTS);
+    await scoped.query("INSERT INTO active_tables (id, transcript) VALUES ('TBL2', $1::jsonb)", [SPEECH]);
+    await scoped.query(
+      `INSERT INTO transcript_segments (table_id, text, ts)
+       SELECT 'TBL2', seg.value->>'text', (seg.value->>'timestamp')::bigint
+       FROM active_tables t CROSS JOIN LATERAL jsonb_array_elements(t.transcript) AS seg(value)
+       WHERE t.id = 'TBL2'`,
+    );
+    await scoped.query("DELETE FROM transcript_segments");
+
+    await ensureSchema();
+    assert.deepEqual(await segmentsFor("TBL2"), [], "deleted speech must stay deleted");
+    assert.equal(await markerCount(), 1);
+
+    await ensureSchema();
+    assert.deepEqual(await segmentsFor("TBL2"), []);
+  });
+
+  it("still backfills when PR #3 created the table but its backfill never inserted", async () => {
+    // The crash loop from the review: #3 created transcript_segments, then the
+    // backfill threw on a legacy segment with no timestamp, so the table exists
+    // in our shape and has never held a row. Shape alone would call that
+    // migrated and strand every transcript in the database permanently.
+    await reset(PRE_PR3 + PR3_SEGMENTS);
+    await scoped.query("INSERT INTO active_tables (id, transcript) VALUES ('TBL2', $1::jsonb)", [SPEECH]);
+
+    await ensureSchema();
+    assert.deepEqual(
+      await segmentsFor("TBL2"),
+      ["first thing said", "second thing said"],
+      "an interrupted backfill must still run",
+    );
+  });
+
   it("boots against a pre-GitHub schema and migrates it", async () => {
     // CREATE TABLE IF NOT EXISTS no-ops on these tables, so without explicit
     // migration the index on theme_candidates(session_id) throws and the

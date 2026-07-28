@@ -90,6 +90,9 @@ export async function drainWriteQueue(): Promise<void> {
  */
 export async function ensureSchema(): Promise<void> {
   const pool = getPool();
+  // Must run before the DDL below: CREATE TABLE IF NOT EXISTS would hand a
+  // brand-new database the same shape a migrated one has.
+  const segments = await probeSegmentsTable(pool);
   // Run as a single multi-statement script for atomicity
   await pool.query(`
     CREATE TABLE IF NOT EXISTS workshops (
@@ -218,36 +221,18 @@ export async function ensureSchema(): Promise<void> {
       ts       BIGINT NOT NULL
     );
 
-    DO $$
-    DECLARE legacy_shape BOOLEAN;
-    BEGIN
+    DO $$ BEGIN
       -- Same story as theme_candidates: a pre-GitHub database already has this
-      -- table, with the ordering column named "id".
-      legacy_shape :=
-            EXISTS (SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = current_schema()
-                      AND table_name = 'transcript_segments' AND column_name = 'id')
-        AND NOT EXISTS (SELECT 1 FROM information_schema.columns
-                        WHERE table_schema = current_schema()
-                          AND table_name = 'transcript_segments' AND column_name = 'seq');
-
-      IF legacy_shape THEN
-        -- Renaming rather than adding a second serial keeps the existing primary
-        -- key, its sequence, and the real insertion order of anything already
-        -- stored. Rows here did NOT come from the backfill, so no marker: the
-        -- backfill still has to run for this database.
+      -- table, with the ordering column named "id". Renaming rather than adding
+      -- a second serial keeps the existing primary key, its sequence, and the
+      -- real insertion order of anything already stored.
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = current_schema()
+                   AND table_name = 'transcript_segments' AND column_name = 'id')
+         AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                         WHERE table_schema = current_schema()
+                           AND table_name = 'transcript_segments' AND column_name = 'seq') THEN
         ALTER TABLE transcript_segments RENAME COLUMN id TO seq;
-      ELSIF EXISTS (SELECT 1 FROM transcript_segments) THEN
-        -- Already in this app's shape and already holding segments, which only
-        -- the backfill or the live append path can have produced — either way
-        -- the backfill has run here. Databases upgraded from the release that
-        -- introduced this table predate schema_migrations and would otherwise
-        -- back-fill one last time, resurrecting transcripts someone deleted in
-        -- the meantime. The inference runs one way only: a database that has
-        -- never migrated has no segments at all.
-        INSERT INTO schema_migrations (name, ran_at)
-        VALUES ('transcripts_to_segments', (EXTRACT(EPOCH FROM now()) * 1000)::BIGINT)
-        ON CONFLICT DO NOTHING;
       END IF;
     END $$;
 
@@ -259,8 +244,125 @@ export async function ensureSchema(): Promise<void> {
     DROP INDEX IF EXISTS idx_transcript_segments_table;
   `);
 
+  await seedBackfillMarker(pool, segments);
   await migrateTranscriptsToSegments(pool);
   logger.info("Database schema verified / created");
+}
+
+/** What transcript_segments looked like before this boot touched anything. */
+interface SegmentsProbe {
+  /** The table existed at all. */
+  present: boolean;
+  /** Ordering column is "id" — the pre-GitHub build's table, not ours. */
+  legacyShape: boolean;
+  /** A row has been inserted at some point, whether or not one is there now. */
+  everHeldRows: boolean;
+  /** schema_migrations already existed, so this is not the upgrade boot. */
+  alreadyTracked: boolean;
+}
+
+/**
+ * Read the shape of transcript_segments before any DDL runs.
+ *
+ * Everything here has to be read first: CREATE TABLE IF NOT EXISTS gives a
+ * brand-new database our exact shape, and the rename gives a pre-GitHub one
+ * the same, so after the DDL block all three cases look alike.
+ */
+async function probeSegmentsTable(pool: pg.Pool): Promise<SegmentsProbe> {
+  const shape = await pool.query<{ has_seq: boolean; has_id: boolean; tracked: boolean }>(`
+    SELECT
+      EXISTS (SELECT 1 FROM information_schema.columns
+              WHERE table_schema = current_schema()
+                AND table_name = 'transcript_segments' AND column_name = 'seq') AS has_seq,
+      EXISTS (SELECT 1 FROM information_schema.columns
+              WHERE table_schema = current_schema()
+                AND table_name = 'transcript_segments' AND column_name = 'id') AS has_id,
+      EXISTS (SELECT 1 FROM information_schema.tables
+              WHERE table_schema = current_schema()
+                AND table_name = 'schema_migrations') AS tracked
+  `);
+  const hasSeq = shape.rows[0]?.has_seq ?? false;
+  const hasId = shape.rows[0]?.has_id ?? false;
+  const alreadyTracked = shape.rows[0]?.tracked ?? false;
+
+  if (!hasSeq && !hasId) {
+    return { present: false, legacyShape: false, everHeldRows: false, alreadyTracked };
+  }
+  if (!hasSeq) {
+    return { present: true, legacyShape: true, everHeldRows: false, alreadyTracked };
+  }
+
+  // "Ever held rows", not "holds rows now" — a transcript deleted under the
+  // release that introduced this table can empty it completely. The identity
+  // sequence keeps the answer after every row is gone: is_called stays true.
+  const rows = await pool.query("SELECT 1 FROM transcript_segments LIMIT 1");
+  let everHeldRows = !!rows.rowCount;
+
+  if (!everHeldRows) {
+    const seq = await pool.query<{ name: string | null }>(
+      "SELECT pg_get_serial_sequence('transcript_segments', 'seq') AS name",
+    );
+    const name = seq.rows[0]?.name;
+    if (name) {
+      // Name comes from pg_get_serial_sequence, already schema-qualified and
+      // quoted by the server — not from anything a caller supplies.
+      const called = await pool.query<{ is_called: boolean }>(`SELECT is_called FROM ${name}`);
+      everHeldRows = called.rows[0]?.is_called === true;
+    }
+  }
+
+  return { present: true, legacyShape: false, everHeldRows, alreadyTracked };
+}
+
+/**
+ * Mark the transcript backfill as done for a database that already ran it under
+ * the release that introduced transcript_segments, which predates
+ * schema_migrations and so left no marker of its own.
+ *
+ * Without this the backfill runs one last time on the upgrade boot, and its
+ * per-table guard — "this table has no segments" — is exactly true of a
+ * transcript someone deliberately deleted in the meantime. It comes back, and
+ * with its SessionConfig already gone it comes back ownerless and unjoinable.
+ *
+ * The discriminator is the shape of the table before this boot, plus whether it
+ * has ever held a row:
+ *
+ *   absent                    never migrated — let the backfill run
+ *   legacy "id" shape         the pre-GitHub build's table; its rows are not
+ *                             from our backfill — let the backfill run
+ *   our shape, never any row   the backfill was interrupted before it inserted
+ *                             anything (it used to throw on a legacy segment
+ *                             with no timestamp) — let it run
+ *   our shape, has held rows   the backfill has run — mark it done
+ *
+ * All of this only applies on the boot that introduces schema_migrations. Once
+ * the table exists the database keeps its own record and there is nothing left
+ * to infer — which is also what makes the recovery in the warning below work:
+ * deleting the marker row to force a re-run would be pointless if the next boot
+ * simply inferred it back.
+ *
+ * The residual hole: a backfill that inserted from active_tables and then threw
+ * on archived_tables reads as complete, so those archived transcripts stay in
+ * the legacy column. Narrow, and the NULL-timestamp guard below removes the
+ * cause going forward — but this is inference, so it warns rather than
+ * proceeding quietly.
+ */
+async function seedBackfillMarker(pool: pg.Pool, probe: SegmentsProbe): Promise<void> {
+  if (probe.alreadyTracked) return;
+  if (!probe.present || probe.legacyShape || !probe.everHeldRows) return;
+
+  const res = await pool.query(
+    "INSERT INTO schema_migrations (name, ran_at) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [TRANSCRIPT_BACKFILL, Date.now()],
+  );
+  if (res.rowCount) {
+    logger.warn(
+      { migration: TRANSCRIPT_BACKFILL },
+      "Marked the transcript backfill as already done — inferred from an existing " +
+        "transcript_segments table that has held rows. If this database in fact has " +
+        "un-migrated transcripts, delete that schema_migrations row and restart.",
+    );
+  }
 }
 
 const TRANSCRIPT_BACKFILL = "transcripts_to_segments";
