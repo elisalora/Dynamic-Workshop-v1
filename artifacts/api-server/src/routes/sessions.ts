@@ -1,35 +1,50 @@
 import { Router } from "express";
-import { getAuth } from "@clerk/express";
 import {
   sessions,
   workshops,
+  sessionConfigs,
+  themeCandidates,
   createSession,
   broadcastConsole,
 } from "../state.js";
-import { persistSession, deleteSession, persistWorkshop } from "../persist.js";
+import {
+  persistSession,
+  deleteSession,
+  persistWorkshop,
+  deleteThemeCandidatesForSession,
+} from "../persist.js";
 import { generateSessionSummary } from "../summary.js";
+import {
+  requireAuth,
+  requireOwned,
+  ownsEntity,
+  type AuthedRequest,
+} from "../middlewares/auth.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
 
 // Create session (optionally nested under a workshop)
-router.post("/sessions", (req, res) => {
-  const { userId } = getAuth(req);
+router.post("/sessions", requireAuth, (req, res) => {
+  const userId = (req as AuthedRequest).userId;
   const { name, workshopId } = req.body as { name?: string; workshopId?: string };
   if (!name?.trim()) {
     res.status(400).json({ error: "name required" });
     return;
   }
-  const s = createSession(name.trim(), workshopId || undefined);
-  if (userId) { s.ownerId = userId; persistSession(s); }
+  // Nesting under a workshop mutates that workshop, so it must be yours.
+  if (workshopId) {
+    if (!requireOwned(req, res, workshops.get(workshopId), "workshop not found")) return;
+  }
+  const s = createSession(name.trim(), workshopId || undefined, userId);
   broadcastConsole();
   res.json(s);
 });
 
 // Rename session
-router.patch("/sessions/:id", (req, res) => {
-  const s = sessions.get(req.params["id"]!);
-  if (!s) { res.status(404).json({ error: "not found" }); return; }
+router.patch("/sessions/:id", requireAuth, (req, res) => {
+  const s = requireOwned(req, res, sessions.get((req.params as { id: string }).id));
+  if (!s) return;
   const { name } = req.body as { name?: string };
   if (name?.trim()) s.name = name.trim();
   persistSession(s);
@@ -38,12 +53,18 @@ router.patch("/sessions/:id", (req, res) => {
 });
 
 // Delete session (tables become unassigned)
-router.delete("/sessions/:id", (req, res) => {
-  const id = req.params["id"]!;
-  const s = sessions.get(id);
-  if (!s) { res.status(404).json({ error: "not found" }); return; }
+router.delete("/sessions/:id", requireAuth, (req, res) => {
+  const id = (req.params as { id: string }).id;
+  const s = requireOwned(req, res, sessions.get(id));
+  if (!s) return;
   sessions.delete(id);
   deleteSession(id);
+  // Themes belong to the session that produced them — drop them with it rather
+  // than leaving orphans that no snapshot can ever surface again.
+  for (const [key, c] of themeCandidates) {
+    if (c.sessionId === id) themeCandidates.delete(key);
+  }
+  deleteThemeCandidatesForSession(id);
   if (s.workshopId) {
     const w = workshops.get(s.workshopId);
     if (w) {
@@ -57,11 +78,17 @@ router.delete("/sessions/:id", (req, res) => {
 });
 
 // Assign a discussion group (table) to this session
-router.post("/sessions/:id/assign/:tableId", (req, res) => {
-  const s = sessions.get(req.params["id"]!);
-  if (!s) { res.status(404).json({ error: "session not found" }); return; }
+router.post("/sessions/:id/assign/:tableId", requireAuth, (req, res) => {
+  const s = requireOwned(req, res, sessions.get((req.params as { id: string }).id), "session not found");
+  if (!s) return;
   const { tableId } = req.params as { tableId: string };
+  // You may only assign a group you own — otherwise assignment would be a way
+  // to pull another facilitator's live table into your own console.
+  if (!requireOwned(req, res, sessionConfigs.get(tableId), "group not found")) return;
+  // Detach from its previous session, but only from sessions the caller can
+  // mutate. A group you own should never be sitting in someone else's session.
   for (const other of sessions.values()) {
+    if (!ownsEntity(req, other.ownerId)) continue;
     const idx = other.tableIds.indexOf(tableId);
     if (idx !== -1) { other.tableIds.splice(idx, 1); persistSession(other); }
   }
@@ -72,10 +99,10 @@ router.post("/sessions/:id/assign/:tableId", (req, res) => {
 });
 
 // Remove a discussion group from this session
-router.post("/sessions/:id/unassign/:tableId", (req, res) => {
-  const s = sessions.get(req.params["id"]!);
-  if (!s) { res.status(404).json({ error: "not found" }); return; }
-  const idx = s.tableIds.indexOf(req.params["tableId"]!);
+router.post("/sessions/:id/unassign/:tableId", requireAuth, (req, res) => {
+  const s = requireOwned(req, res, sessions.get((req.params as { id: string }).id));
+  if (!s) return;
+  const idx = s.tableIds.indexOf((req.params as { tableId: string }).tableId);
   if (idx !== -1) s.tableIds.splice(idx, 1);
   persistSession(s);
   broadcastConsole();
@@ -83,20 +110,28 @@ router.post("/sessions/:id/unassign/:tableId", (req, res) => {
 });
 
 // Generate Claude summary for all discussions in this session
-router.post("/sessions/:id/summary", async (req, res) => {
+router.post("/sessions/:id/summary", requireAuth, async (req, res) => {
+  // Guarded because it spends Anthropic credit and reads every transcript in
+  // the session.
+  const s = requireOwned(req, res, sessions.get((req.params as { id: string }).id));
+  if (!s) return;
   try {
-    const summary = await generateSessionSummary(req.params["id"]!);
+    const summary = await generateSessionSummary(s.id);
     res.json({ summary });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ err, sessionId: req.params["id"] }, "Summary generation failed");
+    logger.error({ err, sessionId: s.id }, "Summary generation failed");
     res.status(500).json({ error: msg });
   }
 });
 
-// Public read-only report page — no auth required
+// Public read-only report page — deliberately unauthenticated so a facilitator
+// can share the write-up with attendees who have no account. The session ID is
+// the capability: it is 40 bits of CSPRNG (see newEntityId) rather than the old
+// 6-char Math.random() token, so the URL is not enumerable. Only the generated
+// summary is exposed here — never transcripts, boards, or theme evidence.
 router.get("/report/:id", (req, res) => {
-  const s = sessions.get(req.params["id"]!);
+  const s = sessions.get((req.params as { id: string }).id);
   if (!s) {
     res.status(404).send("<!DOCTYPE html><html><body><p style='font-family:sans-serif;padding:2rem;color:#6b7280'>Report not found.</p></body></html>");
     return;

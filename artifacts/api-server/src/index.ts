@@ -6,6 +6,7 @@ import { startScribeLoops } from "./scribe.js";
 import { startMetricsLoop } from "./metrics.js";
 import { startThemeLoop } from "./themes.js";
 import { ensureSchema, hydrateFromDb } from "./persist.js";
+import { startTicketSweeper } from "./ws-auth.js";
 
 const rawPort = process.env["PORT"];
 
@@ -34,6 +35,7 @@ ensureSchema()
       startScribeLoops();
       startMetricsLoop();
       startThemeLoop();
+      startTicketSweeper();
     });
   })
   .catch((err) => {

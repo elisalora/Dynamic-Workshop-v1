@@ -1,7 +1,7 @@
 import { WebSocket } from "ws";
 import type { WebSocket as ClientWs } from "ws";
 import { getOrCreateTable, sendToPod } from "./state.js";
-import { persistActiveTable } from "./persist.js";
+import { appendTranscriptSegment } from "./persist.js";
 import { recordWords } from "./metrics.js";
 import { jsonlLog } from "./jsonl-log.js";
 import { logger } from "./lib/logger.js";
@@ -87,8 +87,9 @@ export function connectDeepgram(tableId: string, sampleRate = 48000): void {
         recordWords(tableId, transcript);
         jsonlLog({ kind: "transcript", table: tableId, text: transcript });
 
-        // Persist transcript immediately so it survives a restart before the next scribe run
-        persistActiveTable(table);
+        // Persist this segment immediately so it survives a restart before the
+        // next scribe run — one row, rather than rewriting the whole transcript.
+        appendTranscriptSegment(segment);
 
         // Echo to pod ticker
         sendToPod(tableId, { type: "tick", text: transcript });

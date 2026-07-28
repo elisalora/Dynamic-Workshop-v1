@@ -1,13 +1,14 @@
 import { Router } from "express";
-import { tables, archivedTables } from "../state.js";
+import { tables, archivedTables, sessionConfigs } from "../state.js";
 import { callAnthropic } from "../anthropic.js";
+import { requireAuth, ownsEntity } from "../middlewares/auth.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
 
 const SEARCH_SYSTEM = `You are an assistant helping a workshop facilitator quickly find what was discussed.
 
-Given a search query and excerpts from one or more discussion table transcripts, produce a concise synopsis — 2–5 sentences — that directly answers the query. 
+Given a search query and excerpts from one or more discussion table transcripts, produce a concise synopsis — 2–5 sentences — that directly answers the query.
 
 Rules:
 - Be specific: quote the most relevant things people actually said, using "quotes".
@@ -15,7 +16,11 @@ Rules:
 - If nothing relevant was found, say so clearly in one sentence.
 - Do not pad. Do not hedge. Write for someone who needs a fast answer.`;
 
-router.post("/search", async (req, res) => {
+// Authenticated: this endpoint spends Anthropic credit, and it reads raw
+// transcripts. It is scoped to the caller's own tables — previously one
+// unauthenticated POST returned a Claude-written synopsis of every
+// facilitator's discussions.
+router.post("/search", requireAuth, async (req, res) => {
   const { query } = req.body as { query?: string };
 
   if (!query || typeof query !== "string" || !query.trim()) {
@@ -25,10 +30,16 @@ router.post("/search", async (req, res) => {
 
   const q = query.trim().toLowerCase();
 
-  // Collect all tables (active + archived) and score by relevance
+  // Only tables whose group the caller owns are searchable.
+  const visible = (id: string) => ownsEntity(req, sessionConfigs.get(id)?.ownerId);
+
   const allTables = [
-    ...Array.from(tables.values()).map((t) => ({ ...t, status: "active" })),
-    ...Array.from(archivedTables.values()).map((t) => ({ ...t, status: "archived" })),
+    ...Array.from(tables.values())
+      .filter((t) => visible(t.id))
+      .map((t) => ({ ...t, status: "active" })),
+    ...Array.from(archivedTables.values())
+      .filter((t) => visible(t.id))
+      .map((t) => ({ ...t, status: "archived" })),
   ];
 
   // Score each table by how many transcript segments mention the query terms

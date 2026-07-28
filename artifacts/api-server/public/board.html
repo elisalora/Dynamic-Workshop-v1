@@ -380,10 +380,20 @@ window._toggleTheme = function() {
   }
 
   // ── WebSocket ────────────────────────────────
+  // A board displays one session. Without this it was a wildcard listener, so a
+  // reveal in any workshop lit up every connected display.
+  const sessionId = new URLSearchParams(location.search).get('session') || '';
+
   function connect() {
+    if (!sessionId) {
+      document.getElementById('board-status').textContent =
+        'no session — open this board from a session in the facilitator console';
+      return;
+    }
+
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const base  = location.pathname.replace(/\/[^/]*$/, '');
-    const ws    = new WebSocket(`${proto}//${location.host}${base}/ws?role=board`);
+    const ws    = new WebSocket(`${proto}//${location.host}${base}/ws?role=board&session=${encodeURIComponent(sessionId)}`);
 
     ws.addEventListener('open', () => {
       document.getElementById('board-status').textContent = 'connected · waiting for facilitator…';
@@ -399,7 +409,14 @@ window._toggleTheme = function() {
       } catch {}
     });
 
-    ws.addEventListener('close', () => {
+    ws.addEventListener('close', (evt) => {
+      // 1008 means the server does not recognise this session — reconnecting
+      // will keep failing, so stop and say so rather than spin.
+      if (evt.code === 1008) {
+        document.getElementById('board-status').textContent =
+          'unknown session — reopen this board from the facilitator console';
+        return;
+      }
       document.getElementById('board-status').textContent = 'reconnecting…';
       setTimeout(connect, 2000);
     });
