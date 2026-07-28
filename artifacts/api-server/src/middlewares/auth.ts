@@ -4,9 +4,15 @@ import { appUsers } from "../state.js";
 
 export const ADMIN_EMAILS = ["elisabeth@alora.tech"];
 
+// Normalised once at load. The comparison lowercases the incoming address, so
+// leaving the configured list as-written would mean a single capital letter in
+// an entry here silently locks that admin out — in the one function whose whole
+// job is preventing lockouts.
+const ADMIN_EMAILS_NORMALISED = ADMIN_EMAILS.map((e) => e.trim().toLowerCase());
+
 /** True if `email` is configured as an admin address. Empty email is never admin. */
 export function isAdminEmail(email: string | undefined): boolean {
-  return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+  return !!email && ADMIN_EMAILS_NORMALISED.includes(email.trim().toLowerCase());
 }
 
 /** Attach userId to request; 401 if not authenticated. */

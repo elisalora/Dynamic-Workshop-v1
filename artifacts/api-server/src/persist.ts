@@ -158,6 +158,15 @@ export async function ensureSchema(): Promise<void> {
     -- survive the migration; hydrateFromDb() mints one for any row still NULL.
     ALTER TABLE session_configs ADD COLUMN IF NOT EXISTS join_key TEXT;
 
+    -- Records which one-shot migrations have run. "Has this migration already
+    -- happened" is a fact about the database, not something to re-infer from
+    -- the shape of the data every boot — see migrateTranscriptsToSegments.
+    -- Created before the tables below because the seeding block needs it.
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      name    TEXT   PRIMARY KEY,
+      ran_at  BIGINT NOT NULL
+    );
+
     -- Theme candidates used to live only in memory, so a restart mid-workshop
     -- resurrected themes the facilitator had already dismissed.
     CREATE TABLE IF NOT EXISTS theme_candidates (
@@ -171,6 +180,31 @@ export async function ensureSchema(): Promise<void> {
       seed_prompts JSONB  NOT NULL DEFAULT '[]',
       state        TEXT   NOT NULL DEFAULT 'pending'
     );
+    -- A database from a pre-GitHub build of this app already has a
+    -- theme_candidates table — unscoped, and with its own created_at/updated_at.
+    -- CREATE TABLE IF NOT EXISTS silently no-ops there, so the columns the
+    -- scoped queries need have to be added explicitly or the index below fails
+    -- and the server never boots. No-ops on a table we just created.
+    ALTER TABLE theme_candidates ADD COLUMN IF NOT EXISTS session_id TEXT;
+    ALTER TABLE theme_candidates ADD COLUMN IF NOT EXISTS owner_id   TEXT;
+    -- session_id stays nullable on such a table: pre-scoping rows belong to no
+    -- session, and every read filters on session_id, so they are inert rather
+    -- than visible to everyone.
+    DO $$ BEGIN
+      -- Legacy created_at/updated_at are NOT NULL with no default and the
+      -- scoped writer does not populate them, which would fail every insert.
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = current_schema()
+                   AND table_name = 'theme_candidates' AND column_name = 'created_at') THEN
+        ALTER TABLE theme_candidates ALTER COLUMN created_at DROP NOT NULL;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = current_schema()
+                   AND table_name = 'theme_candidates' AND column_name = 'updated_at') THEN
+        ALTER TABLE theme_candidates ALTER COLUMN updated_at DROP NOT NULL;
+      END IF;
+    END $$;
+
     CREATE INDEX IF NOT EXISTS theme_candidates_session_idx
       ON theme_candidates (session_id);
 
@@ -183,16 +217,46 @@ export async function ensureSchema(): Promise<void> {
       text     TEXT   NOT NULL,
       ts       BIGINT NOT NULL
     );
+
+    DO $$
+    DECLARE legacy_shape BOOLEAN;
+    BEGIN
+      -- Same story as theme_candidates: a pre-GitHub database already has this
+      -- table, with the ordering column named "id".
+      legacy_shape :=
+            EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'transcript_segments' AND column_name = 'id')
+        AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = current_schema()
+                          AND table_name = 'transcript_segments' AND column_name = 'seq');
+
+      IF legacy_shape THEN
+        -- Renaming rather than adding a second serial keeps the existing primary
+        -- key, its sequence, and the real insertion order of anything already
+        -- stored. Rows here did NOT come from the backfill, so no marker: the
+        -- backfill still has to run for this database.
+        ALTER TABLE transcript_segments RENAME COLUMN id TO seq;
+      ELSIF EXISTS (SELECT 1 FROM transcript_segments) THEN
+        -- Already in this app's shape and already holding segments, which only
+        -- the backfill or the live append path can have produced — either way
+        -- the backfill has run here. Databases upgraded from the release that
+        -- introduced this table predate schema_migrations and would otherwise
+        -- back-fill one last time, resurrecting transcripts someone deleted in
+        -- the meantime. The inference runs one way only: a database that has
+        -- never migrated has no segments at all.
+        INSERT INTO schema_migrations (name, ran_at)
+        VALUES ('transcripts_to_segments', (EXTRACT(EPOCH FROM now()) * 1000)::BIGINT)
+        ON CONFLICT DO NOTHING;
+      END IF;
+    END $$;
+
     CREATE INDEX IF NOT EXISTS transcript_segments_table_idx
       ON transcript_segments (table_id, seq);
-
-    -- Records which one-shot migrations have run. "Has this migration already
-    -- happened" is a fact about the database, not something to re-infer from
-    -- the shape of the data every boot — see migrateTranscriptsToSegments.
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      name    TEXT   PRIMARY KEY,
-      ran_at  BIGINT NOT NULL
-    );
+    -- The rename above carries the legacy index over as an exact duplicate of
+    -- the one just created. Two identical indexes on the hottest write path in
+    -- the app is the opposite of what moving transcripts here was for.
+    DROP INDEX IF EXISTS idx_transcript_segments_table;
   `);
 
   await migrateTranscriptsToSegments(pool);
@@ -241,6 +305,25 @@ async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
     `);
     if (res.rowCount) {
       logger.info({ source, segments: res.rowCount }, "Backfilled transcript segments");
+    }
+
+    // The two guards above drop malformed segments silently, and the marker
+    // written below means this migration never comes back for them — so the
+    // count is the only record that speech was left behind. Counted after the
+    // insert so the NOT EXISTS clause sees the same tables it did.
+    const skipped = await pool.query<{ n: string }>(`
+      SELECT count(*) AS n
+      FROM ${source} t
+      CROSS JOIN LATERAL jsonb_array_elements(t.transcript) AS seg(value)
+      WHERE jsonb_array_length(t.transcript) > 0
+        AND (seg.value->>'text' IS NULL OR seg.value->>'timestamp' IS NULL)
+    `);
+    const skippedCount = Number(skipped.rows[0]?.n ?? 0);
+    if (skippedCount) {
+      logger.warn(
+        { source, skipped: skippedCount },
+        "Transcript segments skipped during backfill — missing text or timestamp, not retried",
+      );
     }
   }
 
