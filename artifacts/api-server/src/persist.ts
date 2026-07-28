@@ -34,6 +34,7 @@ import {
   type ThemeCandidate,
   type TranscriptSegment,
 } from "./state.js";
+import { isAdminEmail } from "./middlewares/auth.js";
 import { logger } from "./lib/logger.js";
 
 const { Pool } = pg;
@@ -89,6 +90,9 @@ export async function drainWriteQueue(): Promise<void> {
  */
 export async function ensureSchema(): Promise<void> {
   const pool = getPool();
+  // Must run before the DDL below: CREATE TABLE IF NOT EXISTS would hand a
+  // brand-new database the same shape a migrated one has.
+  const segments = await probeSegmentsTable(pool);
   // Run as a single multi-statement script for atomicity
   await pool.query(`
     CREATE TABLE IF NOT EXISTS workshops (
@@ -157,6 +161,15 @@ export async function ensureSchema(): Promise<void> {
     -- survive the migration; hydrateFromDb() mints one for any row still NULL.
     ALTER TABLE session_configs ADD COLUMN IF NOT EXISTS join_key TEXT;
 
+    -- Records which one-shot migrations have run. "Has this migration already
+    -- happened" is a fact about the database, not something to re-infer from
+    -- the shape of the data every boot — see migrateTranscriptsToSegments.
+    -- Created before the tables below because the seeding block needs it.
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      name    TEXT   PRIMARY KEY,
+      ran_at  BIGINT NOT NULL
+    );
+
     -- Theme candidates used to live only in memory, so a restart mid-workshop
     -- resurrected themes the facilitator had already dismissed.
     CREATE TABLE IF NOT EXISTS theme_candidates (
@@ -170,6 +183,31 @@ export async function ensureSchema(): Promise<void> {
       seed_prompts JSONB  NOT NULL DEFAULT '[]',
       state        TEXT   NOT NULL DEFAULT 'pending'
     );
+    -- A database from a pre-GitHub build of this app already has a
+    -- theme_candidates table — unscoped, and with its own created_at/updated_at.
+    -- CREATE TABLE IF NOT EXISTS silently no-ops there, so the columns the
+    -- scoped queries need have to be added explicitly or the index below fails
+    -- and the server never boots. No-ops on a table we just created.
+    ALTER TABLE theme_candidates ADD COLUMN IF NOT EXISTS session_id TEXT;
+    ALTER TABLE theme_candidates ADD COLUMN IF NOT EXISTS owner_id   TEXT;
+    -- session_id stays nullable on such a table: pre-scoping rows belong to no
+    -- session, and every read filters on session_id, so they are inert rather
+    -- than visible to everyone.
+    DO $$ BEGIN
+      -- Legacy created_at/updated_at are NOT NULL with no default and the
+      -- scoped writer does not populate them, which would fail every insert.
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = current_schema()
+                   AND table_name = 'theme_candidates' AND column_name = 'created_at') THEN
+        ALTER TABLE theme_candidates ALTER COLUMN created_at DROP NOT NULL;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = current_schema()
+                   AND table_name = 'theme_candidates' AND column_name = 'updated_at') THEN
+        ALTER TABLE theme_candidates ALTER COLUMN updated_at DROP NOT NULL;
+      END IF;
+    END $$;
+
     CREATE INDEX IF NOT EXISTS theme_candidates_session_idx
       ON theme_candidates (session_id);
 
@@ -182,24 +220,229 @@ export async function ensureSchema(): Promise<void> {
       text     TEXT   NOT NULL,
       ts       BIGINT NOT NULL
     );
+
+    DO $$ BEGIN
+      -- Same story as theme_candidates: a pre-GitHub database already has this
+      -- table, with the ordering column named "id". Renaming rather than adding
+      -- a second serial keeps the existing primary key, its sequence, and the
+      -- real insertion order of anything already stored.
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = current_schema()
+                   AND table_name = 'transcript_segments' AND column_name = 'id')
+         AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                         WHERE table_schema = current_schema()
+                           AND table_name = 'transcript_segments' AND column_name = 'seq') THEN
+        ALTER TABLE transcript_segments RENAME COLUMN id TO seq;
+      END IF;
+    END $$;
+
     CREATE INDEX IF NOT EXISTS transcript_segments_table_idx
       ON transcript_segments (table_id, seq);
+    -- The rename above carries the legacy index over as an exact duplicate of
+    -- the one just created. Two identical indexes on the hottest write path in
+    -- the app is the opposite of what moving transcripts here was for.
+    DROP INDEX IF EXISTS idx_transcript_segments_table;
   `);
 
+  await seedBackfillMarker(pool, segments);
   await migrateTranscriptsToSegments(pool);
   logger.info("Database schema verified / created");
 }
 
+/** What transcript_segments looked like before this boot touched anything. */
+interface SegmentsProbe {
+  /** The table existed at all. */
+  present: boolean;
+  /** Ordering column is "id" — the pre-GitHub build's table, not ours. */
+  legacyShape: boolean;
+  /**
+   * A row is there now, or the identity sequence has been advanced — which
+   * means an INSERT was *attempted*, not that one committed. See the note in
+   * probeSegmentsTable: nextval is non-transactional.
+   */
+  sequenceAdvanced: boolean;
+  /** schema_migrations already existed, so this is not the upgrade boot. */
+  alreadyTracked: boolean;
+}
+
+/**
+ * Read the shape of transcript_segments before any DDL runs.
+ *
+ * Everything here has to be read first: CREATE TABLE IF NOT EXISTS gives a
+ * brand-new database our exact shape, and the rename gives a pre-GitHub one
+ * the same, so after the DDL block all three cases look alike.
+ */
+async function probeSegmentsTable(pool: pg.Pool): Promise<SegmentsProbe> {
+  const shape = await pool.query<{ has_seq: boolean; has_id: boolean; tracked: boolean }>(`
+    SELECT
+      EXISTS (SELECT 1 FROM information_schema.columns
+              WHERE table_schema = current_schema()
+                AND table_name = 'transcript_segments' AND column_name = 'seq') AS has_seq,
+      EXISTS (SELECT 1 FROM information_schema.columns
+              WHERE table_schema = current_schema()
+                AND table_name = 'transcript_segments' AND column_name = 'id') AS has_id,
+      EXISTS (SELECT 1 FROM information_schema.tables
+              WHERE table_schema = current_schema()
+                AND table_name = 'schema_migrations') AS tracked
+  `);
+  const hasSeq = shape.rows[0]?.has_seq ?? false;
+  const hasId = shape.rows[0]?.has_id ?? false;
+  const alreadyTracked = shape.rows[0]?.tracked ?? false;
+
+  if (!hasSeq && !hasId) {
+    return { present: false, legacyShape: false, sequenceAdvanced: false, alreadyTracked };
+  }
+  if (!hasSeq) {
+    return { present: true, legacyShape: true, sequenceAdvanced: false, alreadyTracked };
+  }
+
+  // Not "holds rows now" — a transcript deleted under the release that
+  // introduced this table can empty it completely, and the emptiness is the
+  // whole reason the marker exists. The identity sequence still remembers.
+  //
+  // What it remembers is weaker than it looks, and this is the limit of the
+  // inference: nextval is non-transactional, so a *failed* INSERT advances the
+  // sequence with nothing committed. A backfill that threw on a NULL timestamp
+  // is indistinguishable here from one that succeeded and was later emptied —
+  // see the residual hole in seedBackfillMarker.
+  const rows = await pool.query("SELECT 1 FROM transcript_segments LIMIT 1");
+  let sequenceAdvanced = !!rows.rowCount;
+
+  if (!sequenceAdvanced) {
+    const seq = await pool.query<{ name: string | null }>(
+      "SELECT pg_get_serial_sequence('transcript_segments', 'seq') AS name",
+    );
+    const name = seq.rows[0]?.name;
+    if (name) {
+      // Name comes from pg_get_serial_sequence, already schema-qualified and
+      // quoted by the server — not from anything a caller supplies.
+      const called = await pool.query<{ is_called: boolean }>(`SELECT is_called FROM ${name}`);
+      sequenceAdvanced = called.rows[0]?.is_called === true;
+    }
+  }
+
+  return { present: true, legacyShape: false, sequenceAdvanced, alreadyTracked };
+}
+
+/**
+ * How much legacy speech is still only in the JSONB columns. Called when the
+ * marker is seeded by inference, because the inference can be wrong and this is
+ * the number that says how much it would cost.
+ *
+ * It does not disambiguate: on a database that really has migrated, this counts
+ * the transcripts someone deliberately deleted, and 0 is the ordinary answer.
+ * The difference that matters is between a small number and every table in the
+ * database.
+ */
+async function countStrandedTranscripts(pool: pg.Pool): Promise<number> {
+  let total = 0;
+  for (const source of ["active_tables", "archived_tables"]) {
+    const r = await pool.query<{ n: string }>(`
+      SELECT count(*) AS n FROM ${source} t
+      WHERE jsonb_array_length(t.transcript) > 0
+        AND NOT EXISTS (SELECT 1 FROM transcript_segments s WHERE s.table_id = t.id)
+    `);
+    total += Number(r.rows[0]?.n ?? 0);
+  }
+  return total;
+}
+
+/**
+ * Mark the transcript backfill as done for a database that already ran it under
+ * the release that introduced transcript_segments, which predates
+ * schema_migrations and so left no marker of its own.
+ *
+ * Without this the backfill runs one last time on the upgrade boot, and its
+ * per-table guard — "this table has no segments" — is exactly true of a
+ * transcript someone deliberately deleted in the meantime. It comes back, and
+ * with its SessionConfig already gone it comes back ownerless and unjoinable.
+ *
+ * The discriminator is the shape of the table before this boot, plus whether
+ * its identity sequence has been advanced:
+ *
+ *   absent                      never migrated — let the backfill run
+ *   legacy "id" shape           the pre-GitHub build's table; its rows are not
+ *                               from our backfill — let the backfill run
+ *   our shape, sequence unused  #3 created the table and never reached the
+ *                               backfill statement at all — let it run
+ *   our shape, sequence used    the backfill has run — mark it done
+ *
+ * All of this only applies on the boot that introduces schema_migrations. Once
+ * the table exists the database keeps its own record and there is nothing left
+ * to infer — which is also what makes the recovery in the warning below work:
+ * deleting the marker row to force a re-run would be pointless if the next boot
+ * simply inferred it back.
+ *
+ * ── The residual hole, which is wider than "sequence used" suggests ──
+ *
+ * nextval is non-transactional, so an INSERT that *fails* still advances the
+ * sequence. A #3 backfill that threw on a legacy segment with no timestamp —
+ * the crash loop from the review — committed nothing and still leaves the
+ * sequence used, so it lands here and gets marked done with every transcript
+ * still un-migrated. From schema and data alone it is identical to a database
+ * that backfilled successfully and later had its segments deleted: one
+ * committed rows and removed them, the other committed none. There is no clean
+ * discriminator, so this is a choice between two failures, and we take this one:
+ *
+ *   - Marking a deleted-then-emptied database as un-migrated resurrects speech
+ *     a participant asked to have removed. Silent, and a broken promise.
+ *   - Marking a crash-looped database as migrated strands its legacy JSONB. But
+ *     that database has never booted successfully, so it surfaces the moment it
+ *     does, it is recoverable by deleting the marker row and restarting, and the
+ *     NULL-timestamp guard below removes the cause going forward.
+ *
+ * Same shape, narrower: a backfill that inserted from active_tables and then
+ * threw on archived_tables reads as complete.
+ *
+ * Because all of that is inference, this warns rather than proceeding quietly,
+ * and counts what is still only in the legacy columns so the warning can be
+ * acted on rather than just noticed.
+ */
+async function seedBackfillMarker(pool: pg.Pool, probe: SegmentsProbe): Promise<void> {
+  if (probe.alreadyTracked) return;
+  if (!probe.present || probe.legacyShape || !probe.sequenceAdvanced) return;
+
+  const res = await pool.query(
+    "INSERT INTO schema_migrations (name, ran_at) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [TRANSCRIPT_BACKFILL, Date.now()],
+  );
+  if (res.rowCount) {
+    const stranded = await countStrandedTranscripts(pool);
+    logger.warn(
+      { migration: TRANSCRIPT_BACKFILL, strandedTranscripts: stranded },
+      "Marked the transcript backfill as already done — inferred from a transcript_segments " +
+        "table whose sequence has been used. `strandedTranscripts` is how many tables still " +
+        "have speech only in the legacy JSONB column: on a migrated database that is the " +
+        "transcripts someone deleted on purpose, and 0 is the ordinary answer. If it is high, " +
+        "this database probably never finished its backfill — delete that schema_migrations " +
+        "row and restart.",
+    );
+  }
+}
+
+const TRANSCRIPT_BACKFILL = "transcripts_to_segments";
+
 /**
  * One-shot backfill of transcripts from the old JSONB columns into
- * transcript_segments. Guarded by NOT EXISTS per table, so it runs once and is
- * a no-op on every subsequent boot. WITH ORDINALITY preserves speech order.
+ * transcript_segments. WITH ORDINALITY preserves speech order.
  *
  * The legacy `transcript` columns are left in place rather than dropped — they
  * are no longer read or written, but keeping them means this migration can be
  * re-run if the backfill ever needs revisiting.
+ *
+ * Because those columns survive, the guard has to be a marker row and not the
+ * absence of segments. It used to be "no segments exist for this table_id",
+ * which is also true of a table whose transcript was *deliberately deleted* —
+ * so a participant asking for their speech to be removed got it back on the
+ * next restart, resurrected from the legacy JSONB. The marker makes the
+ * migration a thing that happened once, which is what it always was.
  */
 async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
+  const done = await pool.query("SELECT 1 FROM schema_migrations WHERE name = $1", [
+    TRANSCRIPT_BACKFILL,
+  ]);
+  if (done.rowCount) return;
+
   for (const source of ["active_tables", "archived_tables"]) {
     const res = await pool.query(`
       INSERT INTO transcript_segments (table_id, text, ts)
@@ -208,6 +451,10 @@ async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
       CROSS JOIN LATERAL jsonb_array_elements(t.transcript) WITH ORDINALITY AS seg(value, ord)
       WHERE jsonb_array_length(t.transcript) > 0
         AND seg.value->>'text' IS NOT NULL
+        -- A legacy segment with no timestamp would violate ts NOT NULL, throw
+        -- out of ensureSchema and exit the process — on this boot and every
+        -- boot after it. One malformed row is not worth a crash loop.
+        AND seg.value->>'timestamp' IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM transcript_segments s WHERE s.table_id = t.id
         )
@@ -216,7 +463,31 @@ async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
     if (res.rowCount) {
       logger.info({ source, segments: res.rowCount }, "Backfilled transcript segments");
     }
+
+    // The two guards above drop malformed segments silently, and the marker
+    // written below means this migration never comes back for them — so the
+    // count is the only record that speech was left behind. Counted after the
+    // insert so the NOT EXISTS clause sees the same tables it did.
+    const skipped = await pool.query<{ n: string }>(`
+      SELECT count(*) AS n
+      FROM ${source} t
+      CROSS JOIN LATERAL jsonb_array_elements(t.transcript) AS seg(value)
+      WHERE jsonb_array_length(t.transcript) > 0
+        AND (seg.value->>'text' IS NULL OR seg.value->>'timestamp' IS NULL)
+    `);
+    const skippedCount = Number(skipped.rows[0]?.n ?? 0);
+    if (skippedCount) {
+      logger.warn(
+        { source, skipped: skippedCount },
+        "Transcript segments skipped during backfill — missing text or timestamp, not retried",
+      );
+    }
   }
+
+  await pool.query(
+    "INSERT INTO schema_migrations (name, ran_at) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [TRANSCRIPT_BACKFILL, Date.now()],
+  );
 }
 
 // ── Hydration ────────────────────────────────────────────────────────────────
@@ -254,8 +525,12 @@ export async function hydrateFromDb(): Promise<void> {
     const u: AppUser = {
       clerkUserId: row.clerk_user_id,
       email: row.email,
+      // ADMIN_EMAILS wins over whatever the row says. requireAdmin reads this
+      // cache directly rather than going through resolveUser, so a configured
+      // admin stored as `facilitator` would otherwise be locked out for every
+      // request that lands before their first /users/me call.
+      role: isAdminEmail(row.email) ? "admin" : (row.role as "admin" | "facilitator"),
       displayName: row.display_name ?? row.email,
-      role: row.role as "admin" | "facilitator",
       createdAt: Number(row.created_at),
     };
     appUsers.set(u.clerkUserId, u);

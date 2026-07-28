@@ -223,13 +223,8 @@ export function createWorkshop(name: string, logoUrl?: string, ownerId?: string)
   return w;
 }
 
-/** Move a table from active to archived. Closes its pod socket (which triggers Deepgram cleanup). */
-export function archiveTable(tableId: string): void {
-  const table = tables.get(tableId);
-  if (!table) return;
-  tables.delete(tableId);
-  archivedTables.set(tableId, table);
-  // Remove from all sessions and persist each affected session
+/** Drop a table from every session that lists it, persisting each one it changed. */
+function detachTableFromSessions(tableId: string): void {
   for (const s of sessions.values()) {
     const idx = s.tableIds.indexOf(tableId);
     if (idx !== -1) {
@@ -237,16 +232,45 @@ export function archiveTable(tableId: string): void {
       getPersist().then((p) => p.persistSession(s)).catch(() => {});
     }
   }
+}
+
+/** Close a table's pod socket. ws-handler's close handler calls disconnectDeepgram. */
+function closePodSocket(tableId: string, reason: string): void {
+  const ws = podSockets.get(tableId);
+  if (ws) {
+    try { ws.close(1000, reason); } catch { /* ignore */ }
+  }
+}
+
+/** Move a table from active to archived. Closes its pod socket (which triggers Deepgram cleanup). */
+export function archiveTable(tableId: string): void {
+  const table = tables.get(tableId);
+  if (!table) return;
+  tables.delete(tableId);
+  archivedTables.set(tableId, table);
+  detachTableFromSessions(tableId);
   // Move in DB: delete from active, upsert to archived
   getPersist().then((p) => {
     p.deleteActiveTable(tableId);
     p.persistArchivedTable(table);
   }).catch(() => {});
-  // Close the pod socket — ws-handler's close handler will call disconnectDeepgram
-  const ws = podSockets.get(tableId);
-  if (ws) {
-    try { ws.close(1000, "archived"); } catch { /* ignore */ }
-  }
+  closePodSocket(tableId, "archived");
+}
+
+/**
+ * Remove a live table outright — the delete counterpart to archiveTable, with
+ * nowhere for the table to land.
+ *
+ * The delete route used to drop only the SessionConfig, which left the table
+ * running in memory, still listed by its session, still holding an active_tables
+ * row with the legacy transcript JSONB in it.
+ */
+export function removeActiveTable(tableId: string): void {
+  if (!tables.has(tableId)) return;
+  tables.delete(tableId);
+  detachTableFromSessions(tableId);
+  getPersist().then((p) => p.deleteActiveTable(tableId)).catch(() => {});
+  closePodSocket(tableId, "deleted");
 }
 
 /** Restore an archived table back to active. */
