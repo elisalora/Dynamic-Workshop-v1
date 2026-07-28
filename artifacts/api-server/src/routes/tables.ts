@@ -6,6 +6,7 @@ import {
   sessionConfigs,
   archiveTable,
   unarchiveTable,
+  removeActiveTable,
   broadcastConsole,
 } from "../state.js";
 import { deleteSessionConfig, deleteArchivedTable, deleteTranscript } from "../persist.js";
@@ -69,6 +70,12 @@ router.delete("/:tableId", requireAuth, (req, res) => {
     archivedTables.delete(tableId);
     deleteArchivedTable(tableId);
   }
+  // A live table keeps its own row in active_tables, and that row still carries
+  // the legacy `transcript` JSONB. Leaving it behind meant the delete looked
+  // complete and then undid itself: the row survived, the backfill re-ran on
+  // the next boot, and the speech came back — attached to a table that no
+  // longer had a SessionConfig, so no owner and no join key either.
+  if (tables.has(tableId)) removeActiveTable(tableId);
   // Transcript segments live in their own table now, so they need explicit
   // cleanup — otherwise deleting a table would leave its speech behind.
   deleteTranscript(tableId);

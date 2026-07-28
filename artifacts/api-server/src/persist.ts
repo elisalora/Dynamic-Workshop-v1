@@ -34,6 +34,7 @@ import {
   type ThemeCandidate,
   type TranscriptSegment,
 } from "./state.js";
+import { isAdminEmail } from "./middlewares/auth.js";
 import { logger } from "./lib/logger.js";
 
 const { Pool } = pg;
@@ -184,22 +185,43 @@ export async function ensureSchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS transcript_segments_table_idx
       ON transcript_segments (table_id, seq);
+
+    -- Records which one-shot migrations have run. "Has this migration already
+    -- happened" is a fact about the database, not something to re-infer from
+    -- the shape of the data every boot — see migrateTranscriptsToSegments.
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      name    TEXT   PRIMARY KEY,
+      ran_at  BIGINT NOT NULL
+    );
   `);
 
   await migrateTranscriptsToSegments(pool);
   logger.info("Database schema verified / created");
 }
 
+const TRANSCRIPT_BACKFILL = "transcripts_to_segments";
+
 /**
  * One-shot backfill of transcripts from the old JSONB columns into
- * transcript_segments. Guarded by NOT EXISTS per table, so it runs once and is
- * a no-op on every subsequent boot. WITH ORDINALITY preserves speech order.
+ * transcript_segments. WITH ORDINALITY preserves speech order.
  *
  * The legacy `transcript` columns are left in place rather than dropped — they
  * are no longer read or written, but keeping them means this migration can be
  * re-run if the backfill ever needs revisiting.
+ *
+ * Because those columns survive, the guard has to be a marker row and not the
+ * absence of segments. It used to be "no segments exist for this table_id",
+ * which is also true of a table whose transcript was *deliberately deleted* —
+ * so a participant asking for their speech to be removed got it back on the
+ * next restart, resurrected from the legacy JSONB. The marker makes the
+ * migration a thing that happened once, which is what it always was.
  */
 async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
+  const done = await pool.query("SELECT 1 FROM schema_migrations WHERE name = $1", [
+    TRANSCRIPT_BACKFILL,
+  ]);
+  if (done.rowCount) return;
+
   for (const source of ["active_tables", "archived_tables"]) {
     const res = await pool.query(`
       INSERT INTO transcript_segments (table_id, text, ts)
@@ -208,6 +230,10 @@ async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
       CROSS JOIN LATERAL jsonb_array_elements(t.transcript) WITH ORDINALITY AS seg(value, ord)
       WHERE jsonb_array_length(t.transcript) > 0
         AND seg.value->>'text' IS NOT NULL
+        -- A legacy segment with no timestamp would violate ts NOT NULL, throw
+        -- out of ensureSchema and exit the process — on this boot and every
+        -- boot after it. One malformed row is not worth a crash loop.
+        AND seg.value->>'timestamp' IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM transcript_segments s WHERE s.table_id = t.id
         )
@@ -217,6 +243,11 @@ async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
       logger.info({ source, segments: res.rowCount }, "Backfilled transcript segments");
     }
   }
+
+  await pool.query(
+    "INSERT INTO schema_migrations (name, ran_at) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [TRANSCRIPT_BACKFILL, Date.now()],
+  );
 }
 
 // ── Hydration ────────────────────────────────────────────────────────────────
@@ -254,8 +285,12 @@ export async function hydrateFromDb(): Promise<void> {
     const u: AppUser = {
       clerkUserId: row.clerk_user_id,
       email: row.email,
+      // ADMIN_EMAILS wins over whatever the row says. requireAdmin reads this
+      // cache directly rather than going through resolveUser, so a configured
+      // admin stored as `facilitator` would otherwise be locked out for every
+      // request that lands before their first /users/me call.
+      role: isAdminEmail(row.email) ? "admin" : (row.role as "admin" | "facilitator"),
       displayName: row.display_name ?? row.email,
-      role: row.role as "admin" | "facilitator",
       createdAt: Number(row.created_at),
     };
     appUsers.set(u.clerkUserId, u);

@@ -4,6 +4,11 @@ import { appUsers } from "../state.js";
 
 export const ADMIN_EMAILS = ["elisabeth@alora.tech"];
 
+/** True if `email` is configured as an admin address. Empty email is never admin. */
+export function isAdminEmail(email: string | undefined): boolean {
+  return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
 /** Attach userId to request; 401 if not authenticated. */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const { userId } = getAuth(req);

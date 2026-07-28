@@ -26,7 +26,10 @@ import {
   tables,
   archivedTables,
   themeCandidates,
+  appUsers,
+  removeActiveTable,
 } from "./state.js";
+import { ADMIN_EMAILS } from "./middlewares/auth.js";
 
 function clearMaps() {
   workshops.delete(WS_ID);
@@ -508,5 +511,143 @@ describe("persist → hydrateFromDb round-trip", () => {
     assert.ok(tc, "theme candidate hydrated");
     assert.equal(tc.sessionId, SESS_ID);
     assert.equal(tc.state, "ready");
+  });
+});
+
+// ── Regressions from the PR #3 review ────────────────────────────────────────
+
+const LEGACY_ID = "TEST_LEGACY";
+const ADMIN_ID = "TEST_ADMIN_USER";
+
+/**
+ * Wait for writes that state.ts triggered on our behalf.
+ *
+ * state.ts reaches persist.ts through a lazy `await import()` to stay clear of
+ * the circular dependency, so a delete it starts is not on the write queue by
+ * the time the call returns — draining immediately drains an empty queue and
+ * reads back a row that is about to disappear. Drain repeatedly until the queue
+ * stays empty across a turn of the event loop.
+ */
+async function settleStateWrites(): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    await new Promise((r) => setTimeout(r, 5));
+    await drainWriteQueue();
+    const pool = new pg.Pool({ connectionString: process.env["DATABASE_URL"] });
+    try {
+      const { rows } = await pool.query("SELECT count(*) FROM active_tables WHERE id = $1", [
+        LEGACY_ID,
+      ]);
+      if (Number(rows[0].count) === 0) return;
+    } finally {
+      await pool.end();
+    }
+  }
+}
+
+describe("post-review regressions", () => {
+  before(async () => {
+    if (!process.env["DATABASE_URL"]) {
+      throw new Error("DATABASE_URL must be set to run persistence integration tests");
+    }
+    await ensureSchema();
+  });
+
+  after(async () => {
+    const pool = new pg.Pool({ connectionString: process.env["DATABASE_URL"] });
+    try {
+      await pool.query("DELETE FROM transcript_segments WHERE table_id = $1", [LEGACY_ID]);
+      await pool.query("DELETE FROM active_tables WHERE id = $1", [LEGACY_ID]);
+      await pool.query("DELETE FROM users WHERE clerk_user_id = $1", [ADMIN_ID]);
+    } finally {
+      await pool.end();
+    }
+    tables.delete(LEGACY_ID);
+    appUsers.delete(ADMIN_ID);
+  });
+
+  /**
+   * A participant asks for their speech to be removed. Deleting the table used
+   * to drop the segments but leave the active_tables row — legacy `transcript`
+   * JSONB and all — so the next boot's backfill put the speech straight back.
+   */
+  it("does not resurrect a deleted transcript on the next boot", async () => {
+    const pool = new pg.Pool({ connectionString: process.env["DATABASE_URL"] });
+    const segments = async () =>
+      Number(
+        (
+          await pool.query("SELECT count(*) FROM transcript_segments WHERE table_id = $1", [
+            LEGACY_ID,
+          ])
+        ).rows[0].count,
+      );
+    try {
+      // A row as the pre-segments build left it, and a database that has not
+      // run the backfill yet.
+      await pool.query(
+        `INSERT INTO active_tables (id, topic, transcript) VALUES ($1, 'legacy', $2::jsonb)
+         ON CONFLICT (id) DO UPDATE SET transcript = EXCLUDED.transcript`,
+        [
+          LEGACY_ID,
+          JSON.stringify([
+            { table: LEGACY_ID, text: "please do not record that part", timestamp: 1000 },
+          ]),
+        ],
+      );
+      await pool.query("DELETE FROM schema_migrations WHERE name = 'transcripts_to_segments'");
+
+      await ensureSchema();
+      assert.equal(await segments(), 1, "backfill should import the legacy transcript once");
+
+      await hydrateFromDb();
+      assert.ok(tables.has(LEGACY_ID), "legacy table hydrates as active");
+
+      // DELETE /api/tables/:tableId
+      removeActiveTable(LEGACY_ID);
+      deleteTranscript(LEGACY_ID);
+      await settleStateWrites();
+      assert.equal(await segments(), 0, "delete removes the segments");
+      assert.equal(
+        Number(
+          (await pool.query("SELECT count(*) FROM active_tables WHERE id = $1", [LEGACY_ID]))
+            .rows[0].count,
+        ),
+        0,
+        "delete removes the active_tables row that carries the legacy JSONB",
+      );
+
+      // restart
+      await ensureSchema();
+      assert.equal(await segments(), 0, "the delete survives the restart");
+    } finally {
+      await pool.end();
+    }
+  });
+
+  /**
+   * ADMIN_EMAILS is configuration. A role written once and cached forever meant
+   * a Clerk blip, or simply adding an address after someone had signed in, left
+   * the admin as a facilitator with no admin around to fix it.
+   */
+  it("lets ADMIN_EMAILS outrank a stale role in the users table", async () => {
+    const pool = new pg.Pool({ connectionString: process.env["DATABASE_URL"] });
+    try {
+      await pool.query(
+        `INSERT INTO users (clerk_user_id, email, display_name, role, created_at)
+         VALUES ($1, $2, 'Admin', 'facilitator', 1)
+         ON CONFLICT (clerk_user_id) DO UPDATE SET role = 'facilitator'`,
+        [ADMIN_ID, ADMIN_EMAILS[0]],
+      );
+    } finally {
+      await pool.end();
+    }
+
+    appUsers.delete(ADMIN_ID);
+    await hydrateFromDb();
+
+    assert.equal(
+      appUsers.get(ADMIN_ID)?.role,
+      "admin",
+      "requireAdmin reads appUsers directly, so the floor has to apply at hydration",
+    );
   });
 });
