@@ -1,59 +1,38 @@
 import { Router } from "express";
-import { getAuth } from "@clerk/express";
 import {
   appUsers,
   workshops,
   sessions,
   sessionConfigs,
-  tables,
-  archivedTables,
   consoleSnapshot,
 } from "../state.js";
 import {
-  upsertUser,
   updateUserRole,
   claimUnownedData,
   persistWorkshop,
   persistSession,
   persistSessionConfig,
 } from "../persist.js";
-import { requireAuth, requireAdmin, ADMIN_EMAILS } from "../middlewares/auth.js";
+import { requireAuth, requireAdmin, type AuthedRequest } from "../middlewares/auth.js";
+import { resolveUser } from "../users.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
 
-// ── Upsert user on login (called by console.html after auth) ─────────────────
+// ── Resolve the caller's own user record ─────────────────────────────────────
+// Email and display name come from Clerk via resolveUser, never from the request
+// body — the body used to decide the admin role, so posting
+// {"email":"<admin address>"} was enough to promote yourself.
 router.post("/users/me", requireAuth, async (req, res) => {
-  const { userId } = getAuth(req);
-  const { email, displayName } = req.body as { email?: string; displayName?: string };
-  if (!userId || !email) { res.status(400).json({ error: "email required" }); return; }
-
-  const isAdminEmail = ADMIN_EMAILS.includes(email.toLowerCase());
-  let user = appUsers.get(userId);
-
-  if (!user) {
-    user = {
-      clerkUserId: userId,
-      email,
-      displayName: displayName ?? email,
-      role: isAdminEmail ? "admin" : "facilitator",
-      createdAt: Date.now(),
-    };
-    appUsers.set(userId, user);
-    await upsertUser(user);
-  } else {
-    // Keep admin role if email matches regardless of DB value
-    if (isAdminEmail && user.role !== "admin") {
-      user.role = "admin";
-      await updateUserRole(userId, "admin");
-    }
-    // Update display name if changed
-    user.displayName = displayName ?? user.displayName;
-    user.email = email;
-    await upsertUser(user);
-  }
-
-  res.json({ userId, role: user.role, isAdmin: user.role === "admin" });
+  const userId = (req as AuthedRequest).userId;
+  const user = await resolveUser(userId);
+  res.json({
+    userId,
+    email: user.email,
+    displayName: user.displayName,
+    role: user.role,
+    isAdmin: user.role === "admin",
+  });
 });
 
 // ── List all users (admin only) ──────────────────────────────────────────────
@@ -83,8 +62,7 @@ router.patch("/admin/users/:userId/role", requireAuth, requireAdmin, async (req,
 
 // ── Claim all unowned data for the admin ─────────────────────────────────────
 router.post("/admin/claim-data", requireAuth, requireAdmin, async (req, res) => {
-  const { userId } = getAuth(req);
-  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = (req as AuthedRequest).userId;
 
   let claimed = 0;
 

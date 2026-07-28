@@ -17,11 +17,10 @@ import {
   broadcastBoard,
   consoleSnapshot,
 } from "./state.js";
-import { upsertUser } from "./persist.js";
-import { ADMIN_EMAILS } from "./middlewares/auth.js";
+import { redeemWsTicket, safeEqual } from "./ws-auth.js";
 import { connectDeepgram, sendAudioToDg, disconnectDeepgram } from "./deepgram.js";
 import { runScribeForTable } from "./scribe.js";
-import { persistActiveTable } from "./persist.js";
+import { appendTranscriptSegment, persistThemeCandidate } from "./persist.js";
 import { jsonlLog } from "./jsonl-log.js";
 import { logger } from "./lib/logger.js";
 
@@ -36,13 +35,13 @@ export function createWss(): WebSocketServer {
 
     switch (role) {
       case "pod":
-        handlePod(ws, tableId, url.searchParams.get("topic") ?? "");
+        handlePod(ws, tableId, url.searchParams.get("key") ?? "");
         break;
       case "console":
-        handleConsole(ws);
+        handleConsole(ws, url.searchParams.get("ticket"));
         break;
       case "board":
-        handleBoard(ws);
+        handleBoard(ws, url.searchParams.get("session") ?? "");
         break;
       default:
         ws.close(1008, "Unknown role");
@@ -65,16 +64,33 @@ export function handleUpgrade(
 
 // ── Pod ──────────────────────────────────────────────────────────────────────
 
-function handlePod(ws: WebSocket, tableId: string, topic: string): void {
+function handlePod(ws: WebSocket, tableId: string, joinKey: string): void {
   if (!tableId) {
     ws.close(1008, "Missing table param");
     return;
   }
 
-  logger.info({ tableId }, "Pod connected");
-  // Use session config name/questions if this table was pre-created
+  // A pod socket accepts live audio and writes straight into the scribe input,
+  // so it has to prove it was invited. The join key is minted with the group and
+  // travels in the link the facilitator shares; the table ID alone is not enough.
+  //
+  // Participants are not Clerk users, so this is a capability check rather than
+  // an identity check — the goal is that knowing (or guessing) a table ID does
+  // not let you join a room or inject speech into someone else's transcript.
   const cfg = sessionConfigs.get(tableId);
-  const resolvedTopic = cfg?.name ?? topic;
+  if (!cfg) {
+    logger.warn({ tableId }, "Pod rejected — no such group");
+    ws.close(1008, "Unknown table");
+    return;
+  }
+  if (!joinKey || !safeEqual(joinKey, cfg.joinKey)) {
+    logger.warn({ tableId }, "Pod rejected — bad or missing join key");
+    ws.close(1008, "Invalid join key");
+    return;
+  }
+
+  logger.info({ tableId }, "Pod connected");
+  const resolvedTopic = cfg.name;
   const table = getOrCreateTable(tableId, resolvedTopic);
   podSockets.set(tableId, ws);
 
@@ -92,7 +108,7 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
     type: "canvas_state",
     board: table.board,
     summary: table.summary,
-    questions: cfg?.questions ?? [],
+    questions: cfg.questions,
     sessionName: resolvedTopic,
     workshopLogo,
   }));
@@ -144,11 +160,13 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
           const text = String(msg["text"] ?? "");
           if (!text.trim()) return;
           const t = getOrCreateTable(tableId);
-          t.transcript.push({ table: tableId, text, timestamp: Date.now() });
+          const segment = { table: tableId, text, timestamp: Date.now() };
+          t.transcript.push(segment);
           t.hasNewSpeech = true;
           jsonlLog({ kind: "demo_transcript", table: tableId, text });
-          // Persist transcript immediately so it survives a restart before the next scribe run
-          persistActiveTable(t);
+          // Append just this segment — see appendTranscriptSegment for why the
+          // whole transcript is no longer rewritten on every line.
+          appendTranscriptSegment(segment);
           sendToPod(tableId, { type: "tick", text });
         }
       } catch {
@@ -169,52 +187,46 @@ function handlePod(ws: WebSocket, tableId: string, topic: string): void {
 
 // ── Console ──────────────────────────────────────────────────────────────────
 
-function handleConsole(ws: WebSocket): void {
-  logger.info("Console connected");
-  // Start unidentified — no data until the browser sends an identify message
-  const client = { userId: null as string | null, isAdmin: false };
-  consoleSockets.set(ws, client);
+function handleConsole(ws: WebSocket, ticket: string | null): void {
+  // Identity is established here, from a single-use ticket the client could only
+  // have obtained by passing requireAuth on POST /api/ws-ticket. The socket
+  // never asks the browser who it is — the previous `identify` message let a
+  // caller name any email and be believed.
+  const userId = redeemWsTicket(ticket);
+  if (!userId) {
+    logger.warn("Console rejected — missing or expired ticket");
+    ws.close(1008, "Unauthorized");
+    return;
+  }
 
-  // Send empty loading state immediately; real data comes after identify
-  ws.send(JSON.stringify({ type: "state", tables: [], waitingSessions: [], candidates: [], sessions: [], workshops: [], archivedTables: [], identifying: true }));
+  const isAdmin = appUsers.get(userId)?.role === "admin";
+  const client = { userId, isAdmin };
+  consoleSockets.set(ws, client);
+  logger.info({ userId, isAdmin }, "Console connected");
+
+  // Snapshot is available immediately — there is no unidentified window.
+  ws.send(JSON.stringify(consoleSnapshot(userId, isAdmin)));
+
+  /** Themes carry transcript evidence; only act on ones this console can see. */
+  function visibleCandidate(candidateId: string) {
+    const candidate = themeCandidates.get(candidateId);
+    if (!candidate) return undefined;
+    if (client.isAdmin) return candidate;
+    const session = sessions.get(candidate.sessionId);
+    if (!session || session.ownerId !== client.userId) {
+      logger.warn({ userId: client.userId, candidateId }, "Console theme action denied");
+      return undefined;
+    }
+    return candidate;
+  }
 
   ws.on("message", (data) => {
     try {
       const msg = JSON.parse(data.toString()) as Record<string, unknown>;
-
-      // ── Identity handshake ─────────────────────────────────────────────────
-      if (msg["type"] === "identify") {
-        const userId = String(msg["userId"] ?? "").trim();
-        const email = String(msg["email"] ?? "").trim();
-        const displayName = String(msg["displayName"] ?? email).trim();
-        if (!userId || !email) return;
-
-        const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
-        client.userId = userId;
-        client.isAdmin = isAdmin;
-
-        // Upsert in memory + DB
-        let user = appUsers.get(userId);
-        if (!user) {
-          user = { clerkUserId: userId, email, displayName, role: isAdmin ? "admin" : "facilitator", createdAt: Date.now() };
-          appUsers.set(userId, user);
-        } else {
-          if (isAdmin && user.role !== "admin") user.role = "admin";
-          user.email = email;
-          user.displayName = displayName;
-        }
-        upsertUser(user).catch(() => {});
-
-        logger.info({ userId, isAdmin }, "Console identified");
-        // Send this user's filtered snapshot
-        ws.send(JSON.stringify(consoleSnapshot(userId, isAdmin)));
-        return;
-      }
-
       const candidateId = String(msg["candidateId"] ?? "");
 
       if (msg["type"] === "reveal" || msg["type"] === "reveal_custom") {
-        const candidate = themeCandidates.get(candidateId);
+        const candidate = visibleCandidate(candidateId);
         if (!candidate || candidate.state === "revealed") return;
 
         const text = msg["type"] === "reveal_custom"
@@ -223,14 +235,22 @@ function handleConsole(ws: WebSocket): void {
 
         candidate.state = "revealed";
         jsonlLog({ kind: "reveal", candidateId, text });
+        persistThemeCandidate(candidate);
 
-        broadcastBoard({ type: "reveal", text, prompts: candidate.seedPrompts });
+        // Only boards showing this session — a reveal used to land on every
+        // connected display, including another facilitator's room.
+        broadcastBoard(candidate.sessionId, {
+          type: "reveal",
+          text,
+          prompts: candidate.seedPrompts,
+        });
         broadcastConsole();
       } else if (msg["type"] === "dismiss") {
-        const candidate = themeCandidates.get(candidateId);
+        const candidate = visibleCandidate(candidateId);
         if (!candidate) return;
         candidate.state = "dismissed";
         jsonlLog({ kind: "dismiss", candidateId });
+        persistThemeCandidate(candidate);
         broadcastConsole();
       }
     } catch (err) {
@@ -239,7 +259,7 @@ function handleConsole(ws: WebSocket): void {
   });
 
   ws.on("close", () => {
-    logger.info("Console disconnected");
+    logger.info({ userId }, "Console disconnected");
     consoleSockets.delete(ws);
   });
 
@@ -248,12 +268,22 @@ function handleConsole(ws: WebSocket): void {
 
 // ── Board ────────────────────────────────────────────────────────────────────
 
-function handleBoard(ws: WebSocket): void {
-  logger.info("Board connected");
-  boardSockets.add(ws);
+function handleBoard(ws: WebSocket, sessionId: string): void {
+  // A board is a passive display in a specific room, so it binds to one session
+  // and only ever receives that session's reveals. It carries no credential —
+  // it is write-only from the server's side and shows nothing until a
+  // facilitator reveals something — but it must not be a wildcard listener.
+  if (!sessionId || !sessions.has(sessionId)) {
+    logger.warn({ sessionId }, "Board rejected — unknown session");
+    ws.close(1008, "Unknown session");
+    return;
+  }
+
+  logger.info({ sessionId }, "Board connected");
+  boardSockets.set(ws, { sessionId });
 
   ws.on("close", () => {
-    logger.info("Board disconnected");
+    logger.info({ sessionId }, "Board disconnected");
     boardSockets.delete(ws);
   });
 

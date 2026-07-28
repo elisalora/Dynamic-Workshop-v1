@@ -940,6 +940,10 @@ window._toggleTheme = function() {
   // ── App state ────────────────────────────────────────────
   const params  = new URLSearchParams(location.search);
   const tableId = params.get('table') || 'T1';
+  // Secret from the facilitator's pod link. The server rejects the socket
+  // without it, so a table ID alone can no longer join a room or push speech
+  // into someone else's transcript.
+  const joinKey = params.get('key') || '';
   const topic   = params.get('topic') || '';
   const demo    = params.get('demo') === '1';
 
@@ -984,7 +988,7 @@ window._toggleTheme = function() {
   function connectWs() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const base  = location.pathname.replace(/\/[^/]*$/, '');
-    ws = new WebSocket(`${proto}//${location.host}${base}/ws?role=pod&table=${encodeURIComponent(tableId)}&topic=${encodeURIComponent(topic)}`);
+    ws = new WebSocket(`${proto}//${location.host}${base}/ws?role=pod&table=${encodeURIComponent(tableId)}&key=${encodeURIComponent(joinKey)}`);
     ws.binaryType = 'arraybuffer';
 
     ws.addEventListener('open', () => {
@@ -1015,8 +1019,19 @@ window._toggleTheme = function() {
         } else if (msg.type === 'tick') showTick(msg.text);
       } catch {}
     });
-    ws.addEventListener('close', () => {
+    ws.addEventListener('close', (evt) => {
       document.getElementById('status-dot').className = 'status-dot';
+      // 1008 is the server refusing this link (unknown table, or a missing or
+      // wrong join key). Retrying cannot fix that, and a silent reconnect loop
+      // looks identical to a network problem — say what is wrong instead.
+      if (evt.code === 1008) {
+        document.getElementById('start-title').textContent = 'This link is not valid';
+        const q = document.getElementById('start-questions');
+        const list = document.getElementById('sq-list');
+        if (list) list.innerHTML = '<div class="sq-item">Ask your facilitator for a current pod link.</div>';
+        if (q) q.classList.add('visible');
+        return;
+      }
       setTimeout(connectWs, 2000);
     });
   }

@@ -1,6 +1,29 @@
 import type WebSocket from "ws";
+import { randomBytes } from "node:crypto";
 
 export type TableStatus = "flowing" | "circling" | "quiet" | "converging";
+
+// Entity IDs are shown to people (typed into pod links, read off a screen), so
+// they use an unambiguous alphabet — no 0/O/1/I. 8 chars over 32 symbols is 40
+// bits, which is not guessable in the way the previous 6-char Math.random()
+// tokens were.
+const ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export function newEntityId(): string {
+  const bytes = randomBytes(8);
+  let out = "";
+  for (const b of bytes) out += ID_ALPHABET[b % ID_ALPHABET.length];
+  return out;
+}
+
+/**
+ * Secret that grants access to a table's pod socket. Handed out as part of the
+ * pod link the facilitator shares; never derived from the table ID, so knowing
+ * (or guessing) an ID is not enough to join or inject audio.
+ */
+export function newJoinKey(): string {
+  return randomBytes(24).toString("base64url");
+}
 
 export interface TranscriptSegment {
   table: string;
@@ -73,12 +96,20 @@ export interface TableState {
 
 export interface ThemeCandidate {
   id: string;
+  /** Session this theme was detected within. Themes never span sessions. */
+  sessionId: string;
+  ownerId?: string;
   topic: string;
   rationale: string;
   confidence: "low" | "medium" | "high";
   evidence: { table: string; quote: string }[];
   seedPrompts: string[];
   state: "pending" | "ready" | "revealed" | "dismissed";
+}
+
+/** Composite key for the themeCandidates map — topics are only unique per session. */
+export function candidateKey(sessionId: string, topic: string): string {
+  return `${sessionId}::${topic}`;
 }
 
 // ── In-memory store ──────────────────────────────────────────────────────────
@@ -104,6 +135,8 @@ export interface SessionConfig {
   questions: string[];
   createdAt: number;
   ownerId?: string;
+  /** Secret required to open this table's pod socket. See newJoinKey(). */
+  joinKey: string;
 }
 
 /**
@@ -150,18 +183,25 @@ async function getPersist(): Promise<PersistModule> {
 }
 
 /** Create a pod group config (name + questions for a discussion table). */
-export function createGroup(name: string, questions: string[]): SessionConfig {
-  const token = Math.random().toString(36).slice(2, 8).toUpperCase();
-  const config: SessionConfig = { tableId: token, name, questions, createdAt: Date.now() };
+export function createGroup(name: string, questions: string[], ownerId?: string): SessionConfig {
+  const token = newEntityId();
+  const config: SessionConfig = {
+    tableId: token,
+    name,
+    questions,
+    createdAt: Date.now(),
+    ownerId,
+    joinKey: newJoinKey(),
+  };
   sessionConfigs.set(token, config);
   getPersist().then((p) => p.persistSessionConfig(config)).catch(() => {});
   return config;
 }
 
 /** Create a session (middle tier), optionally nested under a workshop. */
-export function createSession(name: string, workshopId?: string): Session {
-  const id = Math.random().toString(36).slice(2, 8).toUpperCase();
-  const s: Session = { id, name, workshopId, tableIds: [], createdAt: Date.now() };
+export function createSession(name: string, workshopId?: string, ownerId?: string): Session {
+  const id = newEntityId();
+  const s: Session = { id, name, workshopId, tableIds: [], createdAt: Date.now(), ownerId };
   sessions.set(id, s);
   if (workshopId) {
     const w = workshops.get(workshopId);
@@ -175,9 +215,9 @@ export function createSession(name: string, workshopId?: string): Session {
 }
 
 /** Create a top-level workshop event. */
-export function createWorkshop(name: string, logoUrl?: string): Workshop {
-  const id = Math.random().toString(36).slice(2, 8).toUpperCase();
-  const w: Workshop = { id, name, sessionIds: [], createdAt: Date.now(), logoUrl };
+export function createWorkshop(name: string, logoUrl?: string, ownerId?: string): Workshop {
+  const id = newEntityId();
+  const w: Workshop = { id, name, sessionIds: [], createdAt: Date.now(), logoUrl, ownerId };
   workshops.set(id, w);
   getPersist().then((p) => p.persistWorkshop(w)).catch(() => {});
   return w;
@@ -224,7 +264,12 @@ export function unarchiveTable(tableId: string): void {
 // WebSocket client registry
 export const podSockets = new Map<string, WebSocket>(); // tableId → ws
 export const consoleSockets = new Map<WebSocket, ConsoleClient>(); // ws → client info
-export const boardSockets = new Set<WebSocket>();
+/**
+ * Board displays, each bound to the session whose reveals it shows. A reveal is
+ * fanned out only to boards on that session — two facilitators running
+ * concurrent workshops must not reveal onto each other's screens.
+ */
+export const boardSockets = new Map<WebSocket, { sessionId: string }>();
 
 export function getOrCreateTable(id: string, topic = ""): TableState {
   if (!tables.has(id)) {
@@ -269,10 +314,11 @@ export function broadcastConsole(): void {
   }
 }
 
-export function broadcastBoard(msg: unknown): void {
+/** Send a message to every board display bound to `sessionId`. */
+export function broadcastBoard(sessionId: string, msg: unknown): void {
   const data = JSON.stringify(msg);
-  for (const ws of boardSockets) {
-    if (ws.readyState === 1) ws.send(data);
+  for (const [ws, board] of boardSockets) {
+    if (board.sessionId === sessionId && ws.readyState === 1) ws.send(data);
   }
 }
 
@@ -287,8 +333,11 @@ export function sendToPod(tableId: string, msg: unknown): void {
  * they own plus unowned entities that appear in their visible workshops.
  */
 export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
-  const canSee = (ownerId?: string) =>
-    isAdmin || !ownerId || ownerId === userId;
+  // An unowned entity used to be visible to *everyone* — which meant any record
+  // written by an unauthenticated caller was broadcast to every console. Every
+  // write path now stamps an ownerId, so unowned records are legacy data:
+  // visible to admins only, until an admin claims them via /admin/claim-data.
+  const canSee = (ownerId?: string) => (isAdmin ? true : !!userId && ownerId === userId);
 
   // ── Workshops visible to this user ───────────────────────────────────────
   const visibleWorkshops = Array.from(workshops.values()).filter((w) => canSee(w.ownerId));
@@ -332,6 +381,7 @@ export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
         metrics: t.metrics,
         board: t.board,
         sessionId,
+        joinKey: cfg?.joinKey ?? null,
       };
     });
 
@@ -342,12 +392,17 @@ export function consoleSnapshot(userId: string | null = null, isAdmin = false) {
       name: c.name,
       questions: c.questions,
       createdAt: c.createdAt,
+      joinKey: c.joinKey,
     }));
 
-  const candidateArr = Array.from(themeCandidates.values()).sort((a, b) => {
-    const order = { ready: 0, pending: 1, revealed: 2, dismissed: 3 };
-    return (order[a.state] ?? 9) - (order[b.state] ?? 9);
-  });
+  // Themes are per-session; only ever hand back candidates for sessions this
+  // user can already see. Evidence carries verbatim quotes from transcripts.
+  const candidateArr = Array.from(themeCandidates.values())
+    .filter((c) => visibleSessionIds.has(c.sessionId))
+    .sort((a, b) => {
+      const order = { ready: 0, pending: 1, revealed: 2, dismissed: 3 };
+      return (order[a.state] ?? 9) - (order[b.state] ?? 9);
+    });
 
   const sessionArr = visibleSessions.map((s) => ({
     id: s.id,

@@ -1,10 +1,14 @@
 import { callAnthropic } from "./anthropic.js";
 import {
   tables,
+  sessions,
   themeCandidates,
+  candidateKey,
   broadcastConsole,
+  type Session,
   type ThemeCandidate,
 } from "./state.js";
+import { persistThemeCandidate } from "./persist.js";
 import { jsonlLog } from "./jsonl-log.js";
 import { logger } from "./lib/logger.js";
 
@@ -78,25 +82,38 @@ function tableDigest(tableId: string): string {
   Synthesis: ${synthesis}`;
 }
 
-export async function runThemePass(): Promise<void> {
-  if (tables.size < 2) return; // Need at least 2 tables
+/**
+ * Run a theme pass for a single session.
+ *
+ * Scoped deliberately: the pass used to digest every table in the process into
+ * one prompt, so two facilitators running concurrent workshops would have their
+ * discussions blended into each other's themes — and the resulting evidence
+ * quotes shown to both. A theme only means something within one session anyway.
+ */
+export async function runThemePassForSession(session: Session): Promise<boolean> {
+  const liveTableIds = session.tableIds.filter((id) => tables.has(id));
+  if (liveTableIds.length < 2) return false; // Need at least 2 tables
 
-  const digest = Array.from(tables.keys()).map(tableDigest).join("\n\n---\n\n");
+  const digest = liveTableIds.map(tableDigest).join("\n\n---\n\n");
 
-  // Candidates are keyed by their raw topic string, so "Trust in AI" and "AI and
+  // Candidates are keyed by their topic string, so "Trust in AI" and "AI and
   // trust" would become two separate cards on the console. Showing Claude the
   // topics already in play lets it reuse an exact string and merge in place.
   // Dismissed topics are listed too: reusing one is a no-op (the merge below only
   // updates pending/ready), which is what we want — it stays dismissed rather than
   // reappearing under slightly different wording.
+  //
+  // Scoped to this session: another facilitator's topics are not ours to show,
+  // and they would push this session's themes toward wording nobody here used.
   const existingTopics = Array.from(themeCandidates.values())
+    .filter((c) => c.sessionId === session.id)
     .map((c) => `- "${c.topic}" (${c.state})`)
     .join("\n");
   const existingBlock = existingTopics
     ? `\n\nEXISTING CANDIDATES:\n${existingTopics}`
     : "";
 
-  logger.info("Running theme pass");
+  logger.info({ sessionId: session.id, tables: liveTableIds.length }, "Running theme pass");
 
   let raw = "";
   try {
@@ -106,25 +123,30 @@ export async function runThemePass(): Promise<void> {
 
     const incoming = Array.isArray(parsed.candidates) ? parsed.candidates : [];
 
-    jsonlLog({ kind: "theme_pass", candidateCount: incoming.length });
+    jsonlLog({ kind: "theme_pass", session: session.id, candidateCount: incoming.length });
 
     for (const c of incoming) {
       const topic = (c.topic ?? "").slice(0, 40);
       if (!topic) continue;
 
-      if (themeCandidates.has(topic)) {
+      const key = candidateKey(session.id, topic);
+      const existing = themeCandidates.get(key);
+
+      if (existing) {
         // Merge — update confidence and evidence
-        const existing = themeCandidates.get(topic)!;
         if (existing.state === "pending" || existing.state === "ready") {
           existing.confidence = c.confidence ?? existing.confidence;
           existing.evidence = c.evidence ?? existing.evidence;
           existing.rationale = c.rationale ?? existing.rationale;
           existing.seedPrompts = (c as unknown as { seed_prompts?: string[] }).seed_prompts ?? existing.seedPrompts;
           if (existing.confidence === "high") existing.state = "ready";
+          persistThemeCandidate(existing);
         }
       } else {
         const candidate: ThemeCandidate = {
-          id: topic,
+          id: key,
+          sessionId: session.id,
+          ownerId: session.ownerId,
           topic,
           rationale: c.rationale ?? "",
           confidence: c.confidence ?? "low",
@@ -132,15 +154,26 @@ export async function runThemePass(): Promise<void> {
           seedPrompts: (c as unknown as { seed_prompts?: string[] }).seed_prompts ?? [],
           state: c.confidence === "high" ? "ready" : "pending",
         };
-        themeCandidates.set(topic, candidate);
-        jsonlLog({ kind: "new_candidate", topic, confidence: candidate.confidence });
+        themeCandidates.set(key, candidate);
+        persistThemeCandidate(candidate);
+        jsonlLog({ kind: "new_candidate", session: session.id, topic, confidence: candidate.confidence });
       }
     }
 
-    broadcastConsole();
+    return incoming.length > 0;
   } catch (err) {
-    logger.error({ err, raw: raw.slice(0, 200) }, "Theme pass error");
+    logger.error({ err, sessionId: session.id, raw: raw.slice(0, 200) }, "Theme pass error");
+    return false;
   }
+}
+
+/** Run a theme pass for every session that currently has ≥2 live tables. */
+export async function runThemePass(): Promise<void> {
+  let changed = false;
+  for (const session of sessions.values()) {
+    if (await runThemePassForSession(session)) changed = true;
+  }
+  if (changed) broadcastConsole();
 }
 
 export function startThemeLoop(): void {

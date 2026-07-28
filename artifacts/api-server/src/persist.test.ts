@@ -16,6 +16,7 @@ const SESS_ID = "TEST_SESS";
 const CFG_ID  = "TEST_CFG";
 const ACT_ID  = "TEST_ACT";
 const ARC_ID  = "TEST_ARC";
+const THEME_ID = `${SESS_ID}::Automation and trust`;
 
 // ── Helpers to clear in-memory state between phases ──────────────────────────
 import {
@@ -24,6 +25,7 @@ import {
   sessionConfigs,
   tables,
   archivedTables,
+  themeCandidates,
 } from "./state.js";
 
 function clearMaps() {
@@ -32,6 +34,7 @@ function clearMaps() {
   sessionConfigs.delete(CFG_ID);
   tables.delete(ACT_ID);
   archivedTables.delete(ARC_ID);
+  themeCandidates.delete(THEME_ID);
 }
 
 // ── Persist + hydrate imports ─────────────────────────────────────────────────
@@ -43,10 +46,34 @@ import {
   persistSessionConfig,
   persistActiveTable,
   persistArchivedTable,
+  persistThemeCandidate,
+  appendTranscriptSegment,
+  deleteTranscript,
   drainWriteQueue,
 } from "./persist.js";
 
-import type { Workshop, Session, SessionConfig, TableState } from "./state.js";
+import type {
+  Workshop,
+  Session,
+  SessionConfig,
+  TableState,
+  ThemeCandidate,
+} from "./state.js";
+
+/**
+ * Transcripts are no longer part of the table row — they are appended one
+ * segment at a time. Replay a fixture's transcript through the real append path
+ * so the round-trip under test is the one production uses.
+ *
+ * Clears first: appending is deliberately not idempotent (every ASR result is a
+ * new utterance), so re-seeding the same fixture across tests would stack
+ * duplicates. Both calls queue on the same per-table key, so the delete is
+ * guaranteed to land before the appends.
+ */
+function persistTranscript(t: TableState): void {
+  deleteTranscript(t.id);
+  for (const segment of t.transcript) appendTranscriptSegment(segment);
+}
 
 // ── Rich test fixtures ────────────────────────────────────────────────────────
 
@@ -72,6 +99,19 @@ const sessionConfig: SessionConfig = {
   name: "Group A",
   questions: ["What is the biggest challenge?", "How might we solve it?"],
   createdAt: 1_700_000_003_000,
+  joinKey: "test-join-key-do-not-reuse",
+};
+
+const themeCandidate: ThemeCandidate = {
+  id: THEME_ID,
+  sessionId: SESS_ID,
+  ownerId: "user_test",
+  topic: "Automation and trust",
+  rationale: "Both tables kept returning to who is accountable when a tool decides.",
+  confidence: "high",
+  evidence: [{ table: ACT_ID, quote: "We need speed!" }],
+  seedPrompts: ["Who signs off when the system is wrong?"],
+  state: "ready",
 };
 
 const boardState = {
@@ -142,6 +182,8 @@ const archivedTable: TableState = {
 async function deleteTestRows() {
   const pool = new pg.Pool({ connectionString: process.env["DATABASE_URL"] });
   try {
+    await pool.query("DELETE FROM transcript_segments WHERE table_id = ANY($1)", [[ACT_ID, ARC_ID]]);
+    await pool.query("DELETE FROM theme_candidates WHERE session_id = $1", [SESS_ID]);
     await pool.query("DELETE FROM active_tables   WHERE id = $1", [ACT_ID]);
     await pool.query("DELETE FROM archived_tables WHERE id = $1", [ARC_ID]);
     await pool.query("DELETE FROM session_configs WHERE table_id = $1", [CFG_ID]);
@@ -228,6 +270,9 @@ describe("persist → hydrateFromDb round-trip", () => {
     assert.equal(c.name, sessionConfig.name);
     assert.deepEqual(c.questions, sessionConfig.questions);
     assert.equal(c.createdAt, sessionConfig.createdAt);
+    // The join key is the pod's credential — losing it across a restart would
+    // silently invalidate every link already handed out at the workshop.
+    assert.equal(c.joinKey, sessionConfig.joinKey);
 
     clearMaps();
   });
@@ -235,6 +280,7 @@ describe("persist → hydrateFromDb round-trip", () => {
   it("persists and hydrates an active table with full board state", async () => {
     tables.set(ACT_ID, activeTable);
     persistActiveTable(activeTable);
+    persistTranscript(activeTable);
     await drainWriteQueue();
 
     tables.delete(ACT_ID);
@@ -271,6 +317,7 @@ describe("persist → hydrateFromDb round-trip", () => {
   it("persists and hydrates an archived table", async () => {
     archivedTables.set(ARC_ID, archivedTable);
     persistArchivedTable(archivedTable);
+    persistTranscript(archivedTable);
     await drainWriteQueue();
 
     archivedTables.delete(ARC_ID);
@@ -290,6 +337,106 @@ describe("persist → hydrateFromDb round-trip", () => {
     clearMaps();
   });
 
+  it("persists and hydrates a theme candidate", async () => {
+    // A theme candidate is only reachable through its session, so the session
+    // has to exist for the hydrated candidate to be visible in any snapshot.
+    workshops.set(WS_ID, workshop);
+    persistWorkshop(workshop);
+    sessions.set(SESS_ID, session);
+    persistSession(session);
+    themeCandidates.set(THEME_ID, themeCandidate);
+    persistThemeCandidate(themeCandidate);
+    await drainWriteQueue();
+
+    clearMaps();
+    await hydrateFromDb();
+
+    const c = themeCandidates.get(THEME_ID);
+    assert.ok(c, "theme candidate should be in memory after hydration");
+    assert.equal(c.sessionId, SESS_ID);
+    assert.equal(c.ownerId, "user_test");
+    assert.equal(c.topic, themeCandidate.topic);
+    assert.equal(c.confidence, "high");
+    assert.deepEqual(c.evidence, themeCandidate.evidence);
+    assert.deepEqual(c.seedPrompts, themeCandidate.seedPrompts);
+    assert.equal(c.state, "ready");
+
+    clearMaps();
+  });
+
+  it("keeps a dismissed theme dismissed across a restart", async () => {
+    workshops.set(WS_ID, workshop);
+    persistWorkshop(workshop);
+    sessions.set(SESS_ID, session);
+    persistSession(session);
+
+    const dismissed: ThemeCandidate = { ...themeCandidate, state: "dismissed" };
+    themeCandidates.set(THEME_ID, dismissed);
+    persistThemeCandidate(dismissed);
+    await drainWriteQueue();
+
+    clearMaps();
+    await hydrateFromDb();
+
+    // Themes used to live only in memory, so a restart mid-workshop brought
+    // dismissed themes back onto the facilitator's console.
+    assert.equal(themeCandidates.get(THEME_ID)?.state, "dismissed");
+
+    clearMaps();
+  });
+
+  it("appends transcript segments in order and survives a restart", async () => {
+    tables.set(ACT_ID, activeTable);
+    persistActiveTable(activeTable);
+    persistTranscript(activeTable);
+    await drainWriteQueue();
+
+    tables.delete(ACT_ID);
+    await hydrateFromDb();
+
+    const t = tables.get(ACT_ID);
+    assert.ok(t, "active table hydrated");
+    assert.deepEqual(
+      t.transcript.map((s) => s.text),
+      ["Hello world", "More ideas here"],
+      "segments hydrate in the order they were spoken",
+    );
+
+    // Appending after a restart continues the same transcript rather than
+    // replacing it — the old code rewrote the whole array on every utterance.
+    const later = { table: ACT_ID, text: "A later thought", timestamp: 1_700_000_022_000 };
+    t.transcript.push(later);
+    appendTranscriptSegment(later);
+    await drainWriteQueue();
+
+    tables.delete(ACT_ID);
+    await hydrateFromDb();
+
+    assert.deepEqual(
+      tables.get(ACT_ID)?.transcript.map((s) => s.text),
+      ["Hello world", "More ideas here", "A later thought"],
+    );
+
+    clearMaps();
+  });
+
+  it("deleteTranscript removes a table's speech", async () => {
+    tables.set(ACT_ID, activeTable);
+    persistActiveTable(activeTable);
+    persistTranscript(activeTable);
+    await drainWriteQueue();
+
+    deleteTranscript(ACT_ID);
+    await drainWriteQueue();
+
+    tables.delete(ACT_ID);
+    await hydrateFromDb();
+
+    assert.deepEqual(tables.get(ACT_ID)?.transcript, []);
+
+    clearMaps();
+  });
+
   it("full end-to-end: all entities persist and survive a simulated restart", async () => {
     // Phase 1 — Populate (simulates live server writes)
     workshops.set(WS_ID, workshop);
@@ -297,12 +444,16 @@ describe("persist → hydrateFromDb round-trip", () => {
     sessionConfigs.set(CFG_ID, sessionConfig);
     tables.set(ACT_ID, activeTable);
     archivedTables.set(ARC_ID, archivedTable);
+    themeCandidates.set(THEME_ID, themeCandidate);
 
     persistWorkshop(workshop);
     persistSession(session);
     persistSessionConfig(sessionConfig);
     persistActiveTable(activeTable);
+    persistTranscript(activeTable);
     persistArchivedTable(archivedTable);
+    persistTranscript(archivedTable);
+    persistThemeCandidate(themeCandidate);
 
     await drainWriteQueue();
 
@@ -350,5 +501,12 @@ describe("persist → hydrateFromDb round-trip", () => {
     assert.equal(arc.topic, "Climate tech");
     assert.equal(arc.board.synthesis, null);
     assert.equal(arc.summary, "Archived table summary");
+    assert.deepEqual(arc.transcript.map((s) => s.text), ["Carbon capture is promising"]);
+
+    // Theme candidate
+    const tc = themeCandidates.get(THEME_ID);
+    assert.ok(tc, "theme candidate hydrated");
+    assert.equal(tc.sessionId, SESS_ID);
+    assert.equal(tc.state, "ready");
   });
 });

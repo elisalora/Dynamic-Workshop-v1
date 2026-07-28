@@ -133,6 +133,24 @@ function getApiBase(): string {
   return '/api';
 }
 
+/**
+ * NOTE: this app cannot currently connect.
+ *
+ * The console socket now requires a single-use ticket from POST /api/ws-ticket,
+ * which sits behind the Clerk session, and every mutating REST route requires an
+ * authenticated caller. This app has no Clerk integration at all — there is no
+ * @clerk/clerk-expo dependency and it never authenticated — so it has no way to
+ * obtain either.
+ *
+ * It was already effectively blind before this change: it never sent the old
+ * `identify` message either, so the server treated it as an anonymous client and
+ * showed it only unowned records. Locking the socket makes that failure explicit
+ * rather than silent.
+ *
+ * To bring it back: add @clerk/clerk-expo, sign the facilitator in, attach the
+ * session token to apiFetch, then call /api/ws-ticket and append
+ * `&ticket=<ticket>` here.
+ */
 function getWsUrl(): string {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `wss://${domain}/api/ws?role=console`;

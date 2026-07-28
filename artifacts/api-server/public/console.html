@@ -1120,7 +1120,7 @@
 <header>
   <h1>Facilitator Console</h1>
   <div class="header-right">
-    <a href="board.html" target="_blank" id="btn-open-board" style="
+    <a href="#" target="_blank" id="btn-open-board" style="
       display:inline-flex;align-items:center;gap:0.4rem;
       padding:0.35rem 0.75rem;border-radius:4px;
       border:1px solid var(--border);background:var(--surface);
@@ -1431,8 +1431,6 @@ window._toggleTheme = function() {
     }
   }
 
-  let _currentUser = null; // { userId, email, displayName }
-
   function showConsole(clerk) {
     document.getElementById('auth-overlay').classList.add('hidden');
 
@@ -1440,7 +1438,8 @@ window._toggleTheme = function() {
       const u = clerk.user;
       const email = u.primaryEmailAddress?.emailAddress || '';
       const displayName = u.fullName || email || 'Facilitator';
-      _currentUser = { userId: u.id, email, displayName };
+      // Display only. Identity on the wire comes from the Clerk session cookie
+      // and the ticket the server mints from it — never from these values.
       document.getElementById('user-name').textContent = displayName;
       document.getElementById('user-info').style.display = 'flex';
       document.getElementById('btn-signout').addEventListener('click', () => {
@@ -1451,23 +1450,32 @@ window._toggleTheme = function() {
     connect();
   }
 
-  const ADMIN_EMAILS = ['elisabeth@alora.tech'];
-
   // ── WebSocket ──────────────────────────────────────────
-  function connect() {
+  // The socket no longer announces who it is. It presents a single-use ticket
+  // obtained from POST /api/ws-ticket, which sits behind the Clerk session — so
+  // the identity on the connection is one the server established itself.
+  // The admin role comes back from that same call rather than being decided in
+  // the browser by comparing against a hardcoded email list.
+  async function connect() {
+    let ticket;
+    try {
+      const res = await apiFetch('/ws-ticket', 'POST');
+      if (!res.ok) throw new Error(`ticket request failed: ${res.status}`);
+      const data = await res.json();
+      ticket = data.ticket;
+      if (data.isAdmin) document.getElementById('btn-admin').style.display = 'inline-flex';
+    } catch (err) {
+      document.getElementById('conn-dot').className = 'conn-dot';
+      document.getElementById('conn-text').textContent = 'Signed out';
+      setTimeout(connect, 5000);
+      return;
+    }
+
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${location.host}${base}/ws?role=console`);
+    ws = new WebSocket(`${proto}//${location.host}${base}/ws?role=console&ticket=${encodeURIComponent(ticket)}`);
     ws.addEventListener('open', () => {
       document.getElementById('conn-dot').className = 'conn-dot live';
       document.getElementById('conn-text').textContent = 'Live';
-      // Send identity so the server can filter the snapshot for this user
-      if (_currentUser) {
-        ws.send(JSON.stringify({ type: 'identify', ..._currentUser }));
-        // Show admin link for admin users
-        if (ADMIN_EMAILS.includes(_currentUser.email.toLowerCase())) {
-          document.getElementById('btn-admin').style.display = 'inline-flex';
-        }
-      }
     });
     ws.addEventListener('message', (evt) => {
       try {
@@ -1484,6 +1492,28 @@ window._toggleTheme = function() {
 
   function send(msg) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  }
+
+  // A board now shows exactly one session's reveals, so it needs to be told
+  // which. With a single session this button is unambiguous; past that, the
+  // choice belongs to the facilitator via the ▦ Board button on each session.
+  document.getElementById('btn-open-board').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (currentSessions.length === 1) {
+      window.open(`board.html?session=${encodeURIComponent(currentSessions[0].id)}`, '_blank');
+    } else if (currentSessions.length === 0) {
+      alert('Create a session first — a board displays one session’s reveals.');
+    } else {
+      alert('Open the board from the session you want to display — use the ▦ Board button on that session.');
+    }
+  });
+
+  // The join key is what actually admits a pod, so it travels in the link the
+  // facilitator shares. A table ID on its own is no longer enough to connect.
+  function podLink(tableId, joinKey) {
+    const q = joinKey ? `?table=${encodeURIComponent(tableId)}&key=${encodeURIComponent(joinKey)}`
+                      : `?table=${encodeURIComponent(tableId)}`;
+    return `${location.origin}${base}/pod.html${q}`;
   }
 
   function apiFetch(path, method = 'POST', body = null) {
@@ -1800,6 +1830,7 @@ window._toggleTheme = function() {
         <span class="session-name">${esc(s.name)}</span>
         <span class="session-count">${sTables.length} group${sTables.length !== 1 ? 's' : ''}</span>
         <div class="session-actions" onclick="event.stopPropagation()">
+          <a class="btn-sm" href="board.html?session=${encodeURIComponent(s.id)}" target="_blank" title="Open the reveal board for this session">▦ Board</a>
           ${hasSummary ? `<button class="btn-sm btn-sm-summary" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">✦ Summary</button>` : ''}
           <button class="btn-sm btn-sm-primary" data-action="gen-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">${hasSummary ? '↺' : '✦'}</button>
           <button class="btn-sm" data-action="rename-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Rename</button>
@@ -1985,7 +2016,7 @@ window._toggleTheme = function() {
       const board = t.board || { clusters:[], ideas:[], quotes:[], flags:[], synthesis:null };
       const isExpanded = expandedIds.has(t.id);
       const displayName = t.name || t.topic || t.id;
-      const podUrl = `${location.origin}${base}/pod.html?table=${t.id}`;
+      const podUrl = podLink(t.id, t.joinKey);
 
       card.className = 'table-card' + (isExpanded ? ' expanded' : '');
 
@@ -2109,7 +2140,7 @@ window._toggleTheme = function() {
 
   function renderWaitingCard(session, container, prepend) {
     if (container.querySelector(`[data-id="${session.tableId}"]`)) return;
-    const podUrl = `${location.origin}${base}/pod.html?table=${session.tableId}`;
+    const podUrl = podLink(session.tableId, session.joinKey);
     const card = document.createElement('div');
     card.className = 'waiting-card';
     card.dataset.id = session.tableId;

@@ -54,7 +54,9 @@ app.get("/api/auth/config", (_req, res) => {
   res.json({ publishableKey: process.env.CLERK_PUBLISHABLE_KEY ?? "" });
 });
 
-// Serve static HTML pages (pod, board, console — auth is enforced client-side in console.html)
+// Serve static HTML pages (pod, board, console). The pages themselves are
+// public; every route and socket behind them enforces its own auth server-side.
+// console.html's sign-in overlay is presentation, not a security boundary.
 // Use __dirname (dist/) so this resolves correctly regardless of cwd (dev vs production)
 const publicDir = path.resolve(__dirname, "../public");
 app.use("/api", express.static(publicDir));

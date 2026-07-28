@@ -23,11 +23,16 @@ import {
   sessions,
   workshops,
   appUsers,
+  themeCandidates,
+  newJoinKey,
+  candidateKey,
   type AppUser,
   type Workshop,
   type Session,
   type SessionConfig,
   type TableState,
+  type ThemeCandidate,
+  type TranscriptSegment,
 } from "./state.js";
 import { logger } from "./lib/logger.js";
 
@@ -147,8 +152,71 @@ export async function ensureSchema(): Promise<void> {
       role          TEXT    NOT NULL DEFAULT 'facilitator',
       created_at    BIGINT  NOT NULL
     );
+
+    -- Pod join key: the secret in a table's pod link. Nullable so existing rows
+    -- survive the migration; hydrateFromDb() mints one for any row still NULL.
+    ALTER TABLE session_configs ADD COLUMN IF NOT EXISTS join_key TEXT;
+
+    -- Theme candidates used to live only in memory, so a restart mid-workshop
+    -- resurrected themes the facilitator had already dismissed.
+    CREATE TABLE IF NOT EXISTS theme_candidates (
+      id           TEXT   PRIMARY KEY,
+      session_id   TEXT   NOT NULL,
+      owner_id     TEXT,
+      topic        TEXT   NOT NULL,
+      rationale    TEXT   NOT NULL DEFAULT '',
+      confidence   TEXT   NOT NULL DEFAULT 'low',
+      evidence     JSONB  NOT NULL DEFAULT '[]',
+      seed_prompts JSONB  NOT NULL DEFAULT '[]',
+      state        TEXT   NOT NULL DEFAULT 'pending'
+    );
+    CREATE INDEX IF NOT EXISTS theme_candidates_session_idx
+      ON theme_candidates (session_id);
+
+    -- Transcript segments are append-only. They used to live in a JSONB column
+    -- on active_tables that was rewritten in full on every ASR result, making
+    -- write volume quadratic in the length of a discussion.
+    CREATE TABLE IF NOT EXISTS transcript_segments (
+      seq      BIGSERIAL PRIMARY KEY,
+      table_id TEXT   NOT NULL,
+      text     TEXT   NOT NULL,
+      ts       BIGINT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS transcript_segments_table_idx
+      ON transcript_segments (table_id, seq);
   `);
+
+  await migrateTranscriptsToSegments(pool);
   logger.info("Database schema verified / created");
+}
+
+/**
+ * One-shot backfill of transcripts from the old JSONB columns into
+ * transcript_segments. Guarded by NOT EXISTS per table, so it runs once and is
+ * a no-op on every subsequent boot. WITH ORDINALITY preserves speech order.
+ *
+ * The legacy `transcript` columns are left in place rather than dropped — they
+ * are no longer read or written, but keeping them means this migration can be
+ * re-run if the backfill ever needs revisiting.
+ */
+async function migrateTranscriptsToSegments(pool: pg.Pool): Promise<void> {
+  for (const source of ["active_tables", "archived_tables"]) {
+    const res = await pool.query(`
+      INSERT INTO transcript_segments (table_id, text, ts)
+      SELECT t.id, seg.value->>'text', (seg.value->>'timestamp')::bigint
+      FROM ${source} t
+      CROSS JOIN LATERAL jsonb_array_elements(t.transcript) WITH ORDINALITY AS seg(value, ord)
+      WHERE jsonb_array_length(t.transcript) > 0
+        AND seg.value->>'text' IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM transcript_segments s WHERE s.table_id = t.id
+        )
+      ORDER BY t.id, seg.ord
+    `);
+    if (res.rowCount) {
+      logger.info({ source, segments: res.rowCount }, "Backfilled transcript segments");
+    }
+  }
 }
 
 // ── Hydration ────────────────────────────────────────────────────────────────
@@ -157,14 +225,30 @@ export async function ensureSchema(): Promise<void> {
 export async function hydrateFromDb(): Promise<void> {
   const pool = getPool();
 
-  const [wsRes, sessRes, cfgRes, activeRes, archivedRes, usersRes] = await Promise.all([
-    pool.query("SELECT * FROM workshops ORDER BY created_at"),
-    pool.query("SELECT * FROM sessions ORDER BY created_at"),
-    pool.query("SELECT * FROM session_configs ORDER BY created_at"),
-    pool.query("SELECT * FROM active_tables"),
-    pool.query("SELECT * FROM archived_tables"),
-    pool.query("SELECT * FROM users ORDER BY created_at"),
-  ]);
+  const [wsRes, sessRes, cfgRes, activeRes, archivedRes, usersRes, segRes, themeRes] =
+    await Promise.all([
+      pool.query("SELECT * FROM workshops ORDER BY created_at"),
+      pool.query("SELECT * FROM sessions ORDER BY created_at"),
+      pool.query("SELECT * FROM session_configs ORDER BY created_at"),
+      pool.query("SELECT * FROM active_tables"),
+      pool.query("SELECT * FROM archived_tables"),
+      pool.query("SELECT * FROM users ORDER BY created_at"),
+      pool.query("SELECT table_id, text, ts FROM transcript_segments ORDER BY seq"),
+      pool.query("SELECT * FROM theme_candidates"),
+    ]);
+
+  // Group segments by table once, so each table's transcript is a single lookup.
+  const segmentsByTable = new Map<string, TranscriptSegment[]>();
+  for (const row of segRes.rows) {
+    const list = segmentsByTable.get(row.table_id);
+    const segment: TranscriptSegment = {
+      table: row.table_id,
+      text: row.text,
+      timestamp: Number(row.ts),
+    };
+    if (list) list.push(segment);
+    else segmentsByTable.set(row.table_id, [segment]);
+  }
 
   for (const row of usersRes.rows) {
     const u: AppUser = {
@@ -210,16 +294,22 @@ export async function hydrateFromDb(): Promise<void> {
       questions: row.questions as string[],
       createdAt: Number(row.created_at),
       ownerId: row.owner_id ?? undefined,
+      // Groups created before pod auth existed have no key. Mint one now rather
+      // than leaving a table nobody can join — the facilitator picks up the new
+      // link from the console, and any previously shared link stops working.
+      joinKey: row.join_key ?? newJoinKey(),
     };
     sessionConfigs.set(c.tableId, c);
+    if (!row.join_key) persistSessionConfig(c);
   }
 
   for (const row of activeRes.rows) {
+    const transcript = segmentsByTable.get(row.id) ?? [];
     const t: TableState = {
       id: row.id,
       topic: row.topic,
-      transcript: row.transcript as TableState["transcript"],
-      newTranscriptSince: (row.transcript as unknown[]).length, // don't re-scribe on restart
+      transcript,
+      newTranscriptSince: transcript.length, // don't re-scribe on restart
       board: row.board as TableState["board"],
       summary: row.summary,
       metrics: row.metrics as TableState["metrics"],
@@ -233,11 +323,12 @@ export async function hydrateFromDb(): Promise<void> {
   }
 
   for (const row of archivedRes.rows) {
+    const transcript = segmentsByTable.get(row.id) ?? [];
     const t: TableState = {
       id: row.id,
       topic: row.topic,
-      transcript: row.transcript as TableState["transcript"],
-      newTranscriptSince: (row.transcript as unknown[]).length,
+      transcript,
+      newTranscriptSince: transcript.length,
       board: row.board as TableState["board"],
       summary: row.summary,
       metrics: row.metrics as TableState["metrics"],
@@ -250,6 +341,21 @@ export async function hydrateFromDb(): Promise<void> {
     archivedTables.set(t.id, t);
   }
 
+  for (const row of themeRes.rows) {
+    const c: ThemeCandidate = {
+      id: row.id,
+      sessionId: row.session_id,
+      ownerId: row.owner_id ?? undefined,
+      topic: row.topic,
+      rationale: row.rationale,
+      confidence: row.confidence as ThemeCandidate["confidence"],
+      evidence: row.evidence as ThemeCandidate["evidence"],
+      seedPrompts: row.seed_prompts as string[],
+      state: row.state as ThemeCandidate["state"],
+    };
+    themeCandidates.set(candidateKey(c.sessionId, c.topic), c);
+  }
+
   logger.info(
     {
       workshops: workshops.size,
@@ -257,6 +363,8 @@ export async function hydrateFromDb(): Promise<void> {
       sessionConfigs: sessionConfigs.size,
       activeTables: tables.size,
       archivedTables: archivedTables.size,
+      themeCandidates: themeCandidates.size,
+      transcriptSegments: segRes.rows.length,
     },
     "State hydrated from database",
   );
@@ -332,14 +440,16 @@ export function persistSessionConfig(c: SessionConfig): void {
   const questions = JSON.stringify(c.questions);
   const createdAt = c.createdAt;
   const ownerId = c.ownerId ?? null;
+  const joinKey = c.joinKey;
 
   enqueue(`session_config:${tableId}`, () =>
     getPool().query(
-      `INSERT INTO session_configs (table_id, name, questions, created_at, owner_id)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO session_configs (table_id, name, questions, created_at, owner_id, join_key)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (table_id) DO UPDATE SET
-         name = EXCLUDED.name, questions = EXCLUDED.questions, owner_id = EXCLUDED.owner_id`,
-      [tableId, name, questions, createdAt, ownerId],
+         name = EXCLUDED.name, questions = EXCLUDED.questions,
+         owner_id = EXCLUDED.owner_id, join_key = EXCLUDED.join_key`,
+      [tableId, name, questions, createdAt, ownerId, joinKey],
     ).then(() => undefined),
   );
 }
@@ -366,10 +476,12 @@ export function deleteSessionConfig(tableId: string): void {
  * each write faithfully represents the in-memory state at the moment of the call.
  */
 export function persistActiveTable(t: TableState): void {
-  // Snapshot all mutable fields now — before any async handoff
+  // Snapshot all mutable fields now — before any async handoff.
+  // Note: `transcript` is deliberately not written here. Speech is appended to
+  // transcript_segments one row at a time; this row carries only board, metrics
+  // and summary, which change on the 45s/60s loop rather than per utterance.
   const id = t.id;
   const topic = t.topic;
-  const transcript = JSON.stringify(t.transcript);
   const newTranscriptSince = t.newTranscriptSince;
   const board = JSON.stringify(t.board);
   const summary = t.summary;
@@ -381,12 +493,11 @@ export function persistActiveTable(t: TableState): void {
   enqueue(`active_table:${id}`, () =>
     getPool().query(
       `INSERT INTO active_tables
-         (id, topic, transcript, new_transcript_since, board, summary, metrics,
+         (id, topic, new_transcript_since, board, summary, metrics,
           last_scribe_at, has_new_speech, write_seq)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO UPDATE SET
          topic                = EXCLUDED.topic,
-         transcript           = EXCLUDED.transcript,
          new_transcript_since = EXCLUDED.new_transcript_since,
          board                = EXCLUDED.board,
          summary              = EXCLUDED.summary,
@@ -395,7 +506,7 @@ export function persistActiveTable(t: TableState): void {
          has_new_speech       = EXCLUDED.has_new_speech,
          write_seq            = EXCLUDED.write_seq
        WHERE active_tables.write_seq <= EXCLUDED.write_seq`,
-      [id, topic, transcript, newTranscriptSince, board, summary, metrics,
+      [id, topic, newTranscriptSince, board, summary, metrics,
        lastScribeAt, hasNewSpeech, writeSeq],
     ).then(() => undefined),
   );
@@ -407,27 +518,99 @@ export function deleteActiveTable(id: string): void {
   );
 }
 
+// ── Transcript segments ───────────────────────────────────────────────────────
+
+/**
+ * Append one segment of speech. O(1) per utterance.
+ *
+ * This replaces re-serialising the entire transcript array into a JSONB column
+ * on every final ASR result, which made total write volume quadratic in the
+ * length of a discussion — a long multi-table workshop was writing megabytes per
+ * minute to say one new sentence.
+ *
+ * Queued per table so segments land in the order they were spoken.
+ */
+export function appendTranscriptSegment(segment: TranscriptSegment): void {
+  const tableId = segment.table;
+  const text = segment.text;
+  const ts = segment.timestamp;
+
+  enqueue(`transcript:${tableId}`, () =>
+    getPool().query(
+      "INSERT INTO transcript_segments (table_id, text, ts) VALUES ($1, $2, $3)",
+      [tableId, text, ts],
+    ).then(() => undefined),
+  );
+}
+
+/** Remove a table's speech. Called when a table is deleted outright. */
+export function deleteTranscript(tableId: string): void {
+  enqueue(`transcript:${tableId}`, () =>
+    getPool()
+      .query("DELETE FROM transcript_segments WHERE table_id = $1", [tableId])
+      .then(() => undefined),
+  );
+}
+
+// ── Theme candidates ──────────────────────────────────────────────────────────
+
+export function persistThemeCandidate(c: ThemeCandidate): void {
+  const id = c.id;
+  const sessionId = c.sessionId;
+  const ownerId = c.ownerId ?? null;
+  const topic = c.topic;
+  const rationale = c.rationale;
+  const confidence = c.confidence;
+  const evidence = JSON.stringify(c.evidence);
+  const seedPrompts = JSON.stringify(c.seedPrompts);
+  const state = c.state;
+
+  enqueue(`theme:${id}`, () =>
+    getPool().query(
+      `INSERT INTO theme_candidates
+         (id, session_id, owner_id, topic, rationale, confidence, evidence, seed_prompts, state)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (id) DO UPDATE SET
+         owner_id     = EXCLUDED.owner_id,
+         rationale    = EXCLUDED.rationale,
+         confidence   = EXCLUDED.confidence,
+         evidence     = EXCLUDED.evidence,
+         seed_prompts = EXCLUDED.seed_prompts,
+         state        = EXCLUDED.state`,
+      [id, sessionId, ownerId, topic, rationale, confidence, evidence, seedPrompts, state],
+    ).then(() => undefined),
+  );
+}
+
+export function deleteThemeCandidatesForSession(sessionId: string): void {
+  enqueue(`theme_session:${sessionId}`, () =>
+    getPool()
+      .query("DELETE FROM theme_candidates WHERE session_id = $1", [sessionId])
+      .then(() => undefined),
+  );
+}
+
 // ── Archived tables ───────────────────────────────────────────────────────────
 
 export function persistArchivedTable(t: TableState): void {
+  // Transcript is not copied here — segments stay in transcript_segments keyed
+  // by table_id, which is stable across the active → archived move.
   const id = t.id;
   const topic = t.topic;
-  const transcript = JSON.stringify(t.transcript);
   const board = JSON.stringify(t.board);
   const summary = t.summary;
   const metrics = JSON.stringify(t.metrics);
 
   enqueue(`archived_table:${id}`, () =>
     getPool().query(
-      `INSERT INTO archived_tables (id, topic, transcript, board, summary, metrics)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO archived_tables (id, topic, board, summary, metrics)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (id) DO UPDATE SET
          topic      = EXCLUDED.topic,
-         transcript = EXCLUDED.transcript,
          board      = EXCLUDED.board,
          summary    = EXCLUDED.summary,
          metrics    = EXCLUDED.metrics`,
-      [id, topic, transcript, board, summary, metrics],
+      [id, topic, board, summary, metrics],
     ).then(() => undefined),
   );
 }
