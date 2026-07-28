@@ -86,6 +86,12 @@ const SPEECH = JSON.stringify([
   { table: "TBL2", text: "second thing said", timestamp: 1_700_000_002_000 },
 ]);
 
+/** A legacy transcript with a segment missing its timestamp — what made #3 throw. */
+const MALFORMED_SPEECH = JSON.stringify([
+  { table: "TBL2", text: "first thing said", timestamp: 1_700_000_001_000 },
+  { table: "TBL2", text: "second thing said" },
+]);
+
 async function reset(ddl: string): Promise<void> {
   await admin.query(`DROP SCHEMA IF EXISTS ${TEST_SCHEMA} CASCADE`);
   await admin.query(`CREATE SCHEMA ${TEST_SCHEMA}`);
@@ -98,6 +104,26 @@ async function segmentsFor(tableId: string): Promise<string[]> {
     [tableId],
   );
   return r.rows.map((row) => row.text);
+}
+
+async function segmentCount(): Promise<number> {
+  const r = await scoped.query<{ n: string }>("SELECT count(*) AS n FROM transcript_segments");
+  return Number(r.rows[0]?.n ?? 0);
+}
+
+/**
+ * Whether transcript_segments' identity sequence has ever been drawn from —
+ * the thing seedBackfillMarker actually reads. `is_called` lives on the
+ * sequence itself, not in pg_sequences.
+ */
+async function sequenceUsed(): Promise<boolean> {
+  const seq = await scoped.query<{ name: string | null }>(
+    "SELECT pg_get_serial_sequence('transcript_segments', 'seq') AS name",
+  );
+  const name = seq.rows[0]?.name;
+  if (!name) return false;
+  const r = await scoped.query<{ is_called: boolean }>(`SELECT is_called FROM ${name}`);
+  return r.rows[0]?.is_called === true;
 }
 
 async function markerCount(): Promise<number> {
@@ -174,19 +200,68 @@ describe("ensureSchema upgrade paths", () => {
     assert.deepEqual(await segmentsFor("TBL2"), []);
   });
 
-  it("still backfills when PR #3 created the table but its backfill never inserted", async () => {
-    // The crash loop from the review: #3 created transcript_segments, then the
-    // backfill threw on a legacy segment with no timestamp, so the table exists
-    // in our shape and has never held a row. Shape alone would call that
-    // migrated and strand every transcript in the database permanently.
+  it("still backfills when PR #3 never reached its backfill statement", async () => {
+    // #3 created transcript_segments and then failed before the INSERT ran at
+    // all, so the table is in our shape and its sequence has never been used.
+    // Shape alone would call that migrated and strand every transcript in the
+    // database permanently.
     await reset(PRE_PR3 + PR3_SEGMENTS);
     await scoped.query("INSERT INTO active_tables (id, transcript) VALUES ('TBL2', $1::jsonb)", [SPEECH]);
+    assert.equal(await sequenceUsed(), false, "fixture: the sequence must be untouched");
 
     await ensureSchema();
     assert.deepEqual(
       await segmentsFor("TBL2"),
       ["first thing said", "second thing said"],
-      "an interrupted backfill must still run",
+      "an untouched sequence means the backfill never ran",
+    );
+  });
+
+  it("KNOWN HOLE: a backfill that threw mid-INSERT is marked done anyway", async () => {
+    // This pins the limit of the inference rather than a behaviour we want.
+    //
+    // nextval is non-transactional: a failing INSERT advances the sequence with
+    // nothing committed. So #3's crash loop — the backfill throwing on a legacy
+    // segment with no timestamp — leaves exactly what a successful backfill
+    // followed by a delete leaves: our shape, zero rows, sequence used. We
+    // choose to read that as migrated, because the other reading resurrects
+    // deleted speech. The cost is here, and the warning is what makes it
+    // recoverable.
+    await reset(PRE_PR3 + PR3_SEGMENTS);
+    await scoped.query("INSERT INTO active_tables (id, transcript) VALUES ('TBL2', $1::jsonb)", [
+      MALFORMED_SPEECH,
+    ]);
+
+    // Run #3's backfill verbatim — no timestamp guard — and let it throw.
+    await assert.rejects(
+      () =>
+        scoped.query(`
+          INSERT INTO transcript_segments (table_id, text, ts)
+          SELECT t.id, seg.value->>'text', (seg.value->>'timestamp')::bigint
+          FROM active_tables t
+          CROSS JOIN LATERAL jsonb_array_elements(t.transcript) WITH ORDINALITY AS seg(value, ord)
+          WHERE jsonb_array_length(t.transcript) > 0
+          ORDER BY t.id, seg.ord
+        `),
+      /violates not-null constraint/,
+      "fixture: the backfill has to actually throw",
+    );
+    assert.equal(await segmentCount(), 0, "fixture: nothing committed");
+    assert.equal(await sequenceUsed(), true, "fixture: the sequence advanced anyway");
+
+    await ensureSchema();
+    assert.equal(await markerCount(), 1, "marked done — this is the hole");
+    assert.deepEqual(await segmentsFor("TBL2"), [], "and the legacy speech stays stranded");
+
+    // Recovery: the marker is a row, and deleting it makes the next boot run
+    // the backfill for real — which is only true because the inference does not
+    // re-fire once schema_migrations exists.
+    await scoped.query("DELETE FROM schema_migrations WHERE name = 'transcripts_to_segments'");
+    await ensureSchema();
+    assert.deepEqual(
+      await segmentsFor("TBL2"),
+      ["first thing said"],
+      "the segment with a timestamp is recovered; the malformed one is skipped",
     );
   });
 

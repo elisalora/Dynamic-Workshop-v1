@@ -255,8 +255,12 @@ interface SegmentsProbe {
   present: boolean;
   /** Ordering column is "id" — the pre-GitHub build's table, not ours. */
   legacyShape: boolean;
-  /** A row has been inserted at some point, whether or not one is there now. */
-  everHeldRows: boolean;
+  /**
+   * A row is there now, or the identity sequence has been advanced — which
+   * means an INSERT was *attempted*, not that one committed. See the note in
+   * probeSegmentsTable: nextval is non-transactional.
+   */
+  sequenceAdvanced: boolean;
   /** schema_migrations already existed, so this is not the upgrade boot. */
   alreadyTracked: boolean;
 }
@@ -286,19 +290,25 @@ async function probeSegmentsTable(pool: pg.Pool): Promise<SegmentsProbe> {
   const alreadyTracked = shape.rows[0]?.tracked ?? false;
 
   if (!hasSeq && !hasId) {
-    return { present: false, legacyShape: false, everHeldRows: false, alreadyTracked };
+    return { present: false, legacyShape: false, sequenceAdvanced: false, alreadyTracked };
   }
   if (!hasSeq) {
-    return { present: true, legacyShape: true, everHeldRows: false, alreadyTracked };
+    return { present: true, legacyShape: true, sequenceAdvanced: false, alreadyTracked };
   }
 
-  // "Ever held rows", not "holds rows now" — a transcript deleted under the
-  // release that introduced this table can empty it completely. The identity
-  // sequence keeps the answer after every row is gone: is_called stays true.
+  // Not "holds rows now" — a transcript deleted under the release that
+  // introduced this table can empty it completely, and the emptiness is the
+  // whole reason the marker exists. The identity sequence still remembers.
+  //
+  // What it remembers is weaker than it looks, and this is the limit of the
+  // inference: nextval is non-transactional, so a *failed* INSERT advances the
+  // sequence with nothing committed. A backfill that threw on a NULL timestamp
+  // is indistinguishable here from one that succeeded and was later emptied —
+  // see the residual hole in seedBackfillMarker.
   const rows = await pool.query("SELECT 1 FROM transcript_segments LIMIT 1");
-  let everHeldRows = !!rows.rowCount;
+  let sequenceAdvanced = !!rows.rowCount;
 
-  if (!everHeldRows) {
+  if (!sequenceAdvanced) {
     const seq = await pool.query<{ name: string | null }>(
       "SELECT pg_get_serial_sequence('transcript_segments', 'seq') AS name",
     );
@@ -307,11 +317,34 @@ async function probeSegmentsTable(pool: pg.Pool): Promise<SegmentsProbe> {
       // Name comes from pg_get_serial_sequence, already schema-qualified and
       // quoted by the server — not from anything a caller supplies.
       const called = await pool.query<{ is_called: boolean }>(`SELECT is_called FROM ${name}`);
-      everHeldRows = called.rows[0]?.is_called === true;
+      sequenceAdvanced = called.rows[0]?.is_called === true;
     }
   }
 
-  return { present: true, legacyShape: false, everHeldRows, alreadyTracked };
+  return { present: true, legacyShape: false, sequenceAdvanced, alreadyTracked };
+}
+
+/**
+ * How much legacy speech is still only in the JSONB columns. Called when the
+ * marker is seeded by inference, because the inference can be wrong and this is
+ * the number that says how much it would cost.
+ *
+ * It does not disambiguate: on a database that really has migrated, this counts
+ * the transcripts someone deliberately deleted, and 0 is the ordinary answer.
+ * The difference that matters is between a small number and every table in the
+ * database.
+ */
+async function countStrandedTranscripts(pool: pg.Pool): Promise<number> {
+  let total = 0;
+  for (const source of ["active_tables", "archived_tables"]) {
+    const r = await pool.query<{ n: string }>(`
+      SELECT count(*) AS n FROM ${source} t
+      WHERE jsonb_array_length(t.transcript) > 0
+        AND NOT EXISTS (SELECT 1 FROM transcript_segments s WHERE s.table_id = t.id)
+    `);
+    total += Number(r.rows[0]?.n ?? 0);
+  }
+  return total;
 }
 
 /**
@@ -324,16 +357,15 @@ async function probeSegmentsTable(pool: pg.Pool): Promise<SegmentsProbe> {
  * transcript someone deliberately deleted in the meantime. It comes back, and
  * with its SessionConfig already gone it comes back ownerless and unjoinable.
  *
- * The discriminator is the shape of the table before this boot, plus whether it
- * has ever held a row:
+ * The discriminator is the shape of the table before this boot, plus whether
+ * its identity sequence has been advanced:
  *
- *   absent                    never migrated — let the backfill run
- *   legacy "id" shape         the pre-GitHub build's table; its rows are not
- *                             from our backfill — let the backfill run
- *   our shape, never any row   the backfill was interrupted before it inserted
- *                             anything (it used to throw on a legacy segment
- *                             with no timestamp) — let it run
- *   our shape, has held rows   the backfill has run — mark it done
+ *   absent                      never migrated — let the backfill run
+ *   legacy "id" shape           the pre-GitHub build's table; its rows are not
+ *                               from our backfill — let the backfill run
+ *   our shape, sequence unused  #3 created the table and never reached the
+ *                               backfill statement at all — let it run
+ *   our shape, sequence used    the backfill has run — mark it done
  *
  * All of this only applies on the boot that introduces schema_migrations. Once
  * the table exists the database keeps its own record and there is nothing left
@@ -341,26 +373,49 @@ async function probeSegmentsTable(pool: pg.Pool): Promise<SegmentsProbe> {
  * deleting the marker row to force a re-run would be pointless if the next boot
  * simply inferred it back.
  *
- * The residual hole: a backfill that inserted from active_tables and then threw
- * on archived_tables reads as complete, so those archived transcripts stay in
- * the legacy column. Narrow, and the NULL-timestamp guard below removes the
- * cause going forward — but this is inference, so it warns rather than
- * proceeding quietly.
+ * ── The residual hole, which is wider than "sequence used" suggests ──
+ *
+ * nextval is non-transactional, so an INSERT that *fails* still advances the
+ * sequence. A #3 backfill that threw on a legacy segment with no timestamp —
+ * the crash loop from the review — committed nothing and still leaves the
+ * sequence used, so it lands here and gets marked done with every transcript
+ * still un-migrated. From schema and data alone it is identical to a database
+ * that backfilled successfully and later had its segments deleted: one
+ * committed rows and removed them, the other committed none. There is no clean
+ * discriminator, so this is a choice between two failures, and we take this one:
+ *
+ *   - Marking a deleted-then-emptied database as un-migrated resurrects speech
+ *     a participant asked to have removed. Silent, and a broken promise.
+ *   - Marking a crash-looped database as migrated strands its legacy JSONB. But
+ *     that database has never booted successfully, so it surfaces the moment it
+ *     does, it is recoverable by deleting the marker row and restarting, and the
+ *     NULL-timestamp guard below removes the cause going forward.
+ *
+ * Same shape, narrower: a backfill that inserted from active_tables and then
+ * threw on archived_tables reads as complete.
+ *
+ * Because all of that is inference, this warns rather than proceeding quietly,
+ * and counts what is still only in the legacy columns so the warning can be
+ * acted on rather than just noticed.
  */
 async function seedBackfillMarker(pool: pg.Pool, probe: SegmentsProbe): Promise<void> {
   if (probe.alreadyTracked) return;
-  if (!probe.present || probe.legacyShape || !probe.everHeldRows) return;
+  if (!probe.present || probe.legacyShape || !probe.sequenceAdvanced) return;
 
   const res = await pool.query(
     "INSERT INTO schema_migrations (name, ran_at) VALUES ($1, $2) ON CONFLICT DO NOTHING",
     [TRANSCRIPT_BACKFILL, Date.now()],
   );
   if (res.rowCount) {
+    const stranded = await countStrandedTranscripts(pool);
     logger.warn(
-      { migration: TRANSCRIPT_BACKFILL },
-      "Marked the transcript backfill as already done — inferred from an existing " +
-        "transcript_segments table that has held rows. If this database in fact has " +
-        "un-migrated transcripts, delete that schema_migrations row and restart.",
+      { migration: TRANSCRIPT_BACKFILL, strandedTranscripts: stranded },
+      "Marked the transcript backfill as already done — inferred from a transcript_segments " +
+        "table whose sequence has been used. `strandedTranscripts` is how many tables still " +
+        "have speech only in the legacy JSONB column: on a migrated database that is the " +
+        "transcripts someone deleted on purpose, and 0 is the ordinary answer. If it is high, " +
+        "this database probably never finished its backfill — delete that schema_migrations " +
+        "row and restart.",
     );
   }
 }
