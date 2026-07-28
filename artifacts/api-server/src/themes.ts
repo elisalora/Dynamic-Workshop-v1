@@ -167,17 +167,44 @@ export async function runThemePassForSession(session: Session): Promise<boolean>
   }
 }
 
-/** Run a theme pass for every session that currently has ≥2 live tables. */
+/**
+ * Run a theme pass for every session that currently has ≥2 live tables.
+ *
+ * Concurrently, like the scribe loop next door. Sessions used to be walked with
+ * an `await` inside the loop, back when a pass was a single Claude call for the
+ * whole server; once themes were scoped per session that quietly became N calls
+ * end to end. Six live sessions at a 25s call is 150s of a 180s tick, and every
+ * session after the first waits out the ones before it for no reason — they
+ * share nothing.
+ */
 export async function runThemePass(): Promise<void> {
-  let changed = false;
-  for (const session of sessions.values()) {
-    if (await runThemePassForSession(session)) changed = true;
-  }
-  if (changed) broadcastConsole();
+  const results = await Promise.all(
+    Array.from(sessions.values()).map((session) =>
+      runThemePassForSession(session).catch((err) => {
+        logger.error({ err, sessionId: session.id }, "Theme pass error");
+        return false;
+      }),
+    ),
+  );
+  if (results.some(Boolean)) broadcastConsole();
 }
 
 export function startThemeLoop(): void {
+  // One pass at a time. A bare setInterval fires again whether or not the last
+  // tick finished, so a pass that overruns the interval stacks a second one on
+  // top of it — more concurrent Claude calls, and two passes racing to write
+  // the same candidates.
+  let inFlight = false;
   setInterval(() => {
-    runThemePass().catch((err) => logger.error({ err }, "Theme loop error"));
+    if (inFlight) {
+      logger.warn("Theme pass still running at the next tick — skipping this one");
+      return;
+    }
+    inFlight = true;
+    runThemePass()
+      .catch((err) => logger.error({ err }, "Theme loop error"))
+      .finally(() => {
+        inFlight = false;
+      });
   }, THEME_INTERVAL_MS);
 }
