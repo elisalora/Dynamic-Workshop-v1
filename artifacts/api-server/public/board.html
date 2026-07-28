@@ -322,7 +322,9 @@ window._toggleTheme = function() {
     // Center each content row horizontally, truncate if over COLS
     const contentRows = rows.slice(0, ROWS).map(row => {
       const trimmed = row.trimEnd();
-      const pad = Math.floor((COLS - trimmed.length) / 2);
+      // max(0): a word longer than COLS makes this negative, and String.repeat
+      // throws RangeError on a negative count — which killed the whole reveal.
+      const pad = Math.max(0, Math.floor((COLS - trimmed.length) / 2));
       return (' '.repeat(pad) + trimmed).padEnd(COLS, ' ').slice(0, COLS);
     });
 
