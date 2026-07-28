@@ -8,9 +8,10 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx/esm --test src/persist.test.ts"
+    "test": "node --import tsx/esm --test src/*.test.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@clerk/express": "^2.1.43",
     "@clerk/shared": "^4.25.5",
     "@types/pg": "^8.20.0",

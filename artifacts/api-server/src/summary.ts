@@ -67,7 +67,17 @@ Write a structured report with exactly these sections (use ## headings):
 
   logger.info({ sessionId, tables: tableData.length }, "Generating session summary");
 
-  const raw = await callAnthropic(system, userContent);
+  // Six sections across N tables need far more room than the old 2048-token
+  // cap allowed, and more wall clock than the scribe-tuned client default.
+  // But POST /api/sessions/:id/summary awaits this inline, so the whole call
+  // has to finish inside a proxy's request budget: one attempt, no retries.
+  // The facilitator retries by pressing the button again.
+  const raw = await callAnthropic(system, userContent, {
+    effort: "medium",
+    maxTokens: 8_000,
+    timeoutMs: 55_000,
+    maxRetries: 0,
+  });
   // Strip any accidental markdown fences
   const cleaned = raw
     .replace(/^```(?:markdown)?\n?/m, "")
