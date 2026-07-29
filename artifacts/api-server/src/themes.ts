@@ -1,4 +1,11 @@
-import { callAnthropic } from "./anthropic.js";
+import { callAnthropicJSON, AnthropicResponseError } from "./anthropic.js";
+import {
+  BOARD_COLS,
+  BOARD_ROWS,
+  MAX_WORD_CHARS,
+  TOPIC_MAX_CHARS,
+  fitsOnBoard,
+} from "./board-format.js";
 import {
   tables,
   sessions,
@@ -22,7 +29,7 @@ Given digests of what each table is discussing, identify emerging themes that sp
 {
   "candidates": [
     {
-      "topic": "<under 40 characters — see TOPIC guidance below>",
+      "topic": "<${TOPIC_MAX_CHARS} characters or fewer — see TOPIC guidance below>",
       "rationale": "<why this theme spans tables, 1-2 sentences — for the facilitator, not the room>",
       "confidence": "low" | "medium" | "high",
       "evidence": [{"table": "<table_id>", "quote": "<verbatim snippet from that table>"}],
@@ -34,17 +41,18 @@ Given digests of what each table is discussing, identify emerging themes that sp
 TOPIC guidance — this is the headline the entire room reads:
 - Name the live tension, not the subject area. A good topic makes a table want to argue; a bad one makes them want to summarise.
 - Prefer the room's own words over your abstraction. If three tables kept saying "hand-off", the topic says "hand-off" — not "transition management".
-- Good: "Who owns it when the AI is wrong?"
-- Good: "Speed is costing us trust"
-- Good: "Nobody wants to own the hand-off"
+- Good: "Who owns it when AI is wrong?" (29)
+- Good: "Speed is costing us trust" (25)
+- Good: "Nobody wants to own the hand-off" (32)
 - Bad: "AI governance" (a category, not a provocation)
 - Bad: "Challenges and opportunities" (says nothing)
 - Bad: "The group discussed accountability" (a description of the room, not a prompt to it)
 
-TOPIC hard constraints — the board is a physical-style split-flap grid and will mangle anything else:
-- Under 40 characters, including spaces.
+TOPIC hard constraints — the board is a physical split-flap grid of ${BOARD_ROWS} rows by ${BOARD_COLS} characters, and will mangle anything that does not fit:
+- ${TOPIC_MAX_CHARS} characters or fewer, including spaces. This is the exact limit: at ${TOPIC_MAX_CHARS} characters any phrasing lays out on the board, and past it some phrasings do not.
+- WRITE to that length. Do not write a long headline and trim it — a topic that reads like it was cut off is worse on the board than a plainer one that was written short. Count the characters before you commit to the wording.
+- No single word longer than ${MAX_WORD_CHARS} characters. A longer word fills a whole row with characters left over, and the board cannot break it.
 - Write in sentence case. The board uppercases the text itself, so never rely on capitalisation to carry meaning.
-- No single word longer than 22 characters. The board cannot lay out a longer word and the reveal will fail to render at all.
 - Only these characters are safe: A-Z, 0-9, space, and . , ? ! - : / '
 - Use a straight apostrophe ('). Never use curly quotes, double quotes, em dashes, ampersands, parentheses, or emoji.
 
@@ -68,6 +76,169 @@ RULES:
 - An empty candidates array is NORMAL and expected most of the time. Restraint here is a feature — a weak theme revealed to the room derails it.
 - If EXISTING CANDIDATES are listed in the input and one of them already names the theme you found, reuse that topic string EXACTLY, character for character, so it updates in place instead of creating a near-duplicate card. Only invent a new topic string for a genuinely new theme.
 - Output ONLY the JSON — no markdown fences, no explanation.`;
+
+/**
+ * Asks for a shorter headline rather than cutting one down.
+ *
+ * The board-fit rules are stated as a rewriting brief, not as a filter: the
+ * point of this pass is that the topic that comes back was *written* to the
+ * budget. A chopped headline in front of a room reads as a broken system; a
+ * plainer one that fits reads as an edit.
+ */
+const TOPIC_REWRITE_SYSTEM = `You rewrite workshop headlines so they fit a split-flap board.
+
+The board is a physical grid of ${BOARD_ROWS} rows by ${BOARD_COLS} characters at the front of the room. Every headline must be ${TOPIC_MAX_CHARS} characters or fewer, with no single word over ${MAX_WORD_CHARS} characters.
+
+You are given headlines that are too long. Rewrite each one so it fits.
+
+- REWRITE, never trim. Do not hand back the original with the end cut off, an ellipsis, or an abbreviation standing in for a word. Find shorter words and a shorter shape.
+- Keep the provocation. If the original names a live tension, the rewrite still names it. Losing a word is fine; losing the argument is not.
+- Cut the framing, not the point. "The question of who really owns the hand-off" becomes "Who owns the hand-off?" — the framing was the fat.
+- Keep the room's own words. Do not trade a concrete word the tables actually said for a shorter abstract one.
+- Sentence case. Only these characters: A-Z, 0-9, space, and . , ? ! - : / ' — straight apostrophes only.
+
+Output ONLY a JSON object in this exact shape:
+{"rewritten": [{"original": "<the headline you were given, character for character>", "topic": "<the rewritten headline>"}]}
+
+Return exactly one entry for every headline you were given.`;
+
+const str = { type: "string" } as const;
+
+/**
+ * Enforced server-side via output_config.format, like the scribe's.
+ *
+ * Note what is NOT here: a maxLength on `topic`. Anthropic's structured outputs
+ * do not support string length constraints, so the character budget cannot be
+ * enforced by the schema — it is carried by the prompt, then checked by
+ * fitsOnBoard and repaired by the rewrite pass below.
+ */
+const THEME_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  required: ["candidates"],
+  properties: {
+    candidates: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["topic", "rationale", "confidence", "evidence", "seed_prompts"],
+        properties: {
+          topic: str,
+          rationale: str,
+          confidence: { type: "string", enum: ["low", "medium", "high"] },
+          evidence: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["table", "quote"],
+              properties: { table: str, quote: str },
+            },
+          },
+          seed_prompts: { type: "array", items: str },
+        },
+      },
+    },
+  },
+};
+
+const TOPIC_REWRITE_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  required: ["rewritten"],
+  properties: {
+    rewritten: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["original", "topic"],
+        properties: { original: str, topic: str },
+      },
+    },
+  },
+};
+
+/** The theme pass response, in the model's snake_case. */
+interface ThemePassCandidate {
+  topic: string;
+  rationale: string;
+  confidence: "low" | "medium" | "high";
+  evidence: { table: string; quote: string }[];
+  seed_prompts: string[];
+}
+
+/** A topic is board-ready when it is inside the budget AND actually lays out. */
+function isBoardReady(topic: string): boolean {
+  return topic.length <= TOPIC_MAX_CHARS && fitsOnBoard(topic);
+}
+
+/**
+ * Returns the candidates whose topics will render, having asked Claude to
+ * re-word any that will not.
+ *
+ * The rewrite runs at most once per pass and only over the offenders, so the
+ * common case — every topic already inside budget — costs nothing. A topic that
+ * is still too long after the rewrite is dropped rather than cut down: the next
+ * pass is 180 seconds away and gets another go at the wording, which is a
+ * better outcome than a mangled headline in front of the room.
+ */
+async function fitTopicsToBoard(
+  candidates: ThemePassCandidate[],
+  sessionId: string,
+): Promise<ThemePassCandidate[]> {
+  const ready: ThemePassCandidate[] = [];
+  const overBudget: ThemePassCandidate[] = [];
+
+  for (const c of candidates) {
+    const topic = c.topic.trim();
+    if (!topic) continue;
+    (isBoardReady(topic) ? ready : overBudget).push({ ...c, topic });
+  }
+
+  if (overBudget.length === 0) return ready;
+
+  jsonlLog({
+    kind: "topic_rewrite",
+    session: sessionId,
+    topics: overBudget.map((c) => c.topic),
+  });
+
+  let rewrites = new Map<string, string>();
+  try {
+    const parsed = await callAnthropicJSON<{ rewritten: { original: string; topic: string }[] }>(
+      TOPIC_REWRITE_SYSTEM,
+      `Headlines to rewrite:\n${overBudget.map((c) => `- ${c.topic} (${c.topic.length} characters)`).join("\n")}`,
+      TOPIC_REWRITE_SCHEMA,
+      // Cheap and short. It sits inside the 180s theme tick alongside the pass
+      // that produced these, so it must not deliberate.
+      { effort: "low", timeoutMs: 15_000, maxRetries: 1 },
+    );
+    rewrites = new Map(parsed.rewritten.map((r) => [r.original, r.topic.trim()]));
+  } catch (err) {
+    logger.warn(
+      { err, sessionId, raw: err instanceof AnthropicResponseError ? err.raw.slice(0, 200) : undefined },
+      "Topic rewrite failed — dropping the over-long candidates from this pass",
+    );
+  }
+
+  for (const c of overBudget) {
+    const rewritten = rewrites.get(c.topic);
+    if (rewritten && isBoardReady(rewritten)) {
+      ready.push({ ...c, topic: rewritten });
+      logger.info({ sessionId, from: c.topic, to: rewritten }, "Rewrote theme topic to fit the board");
+    } else {
+      logger.warn(
+        { sessionId, topic: c.topic, rewritten },
+        "Dropping theme candidate — topic will not lay out on the board",
+      );
+      jsonlLog({ kind: "topic_dropped", session: sessionId, topic: c.topic });
+    }
+  }
+
+  return ready;
+}
 
 function tableDigest(tableId: string): string {
   const table = tables.get(tableId);
@@ -115,30 +286,31 @@ export async function runThemePassForSession(session: Session): Promise<boolean>
 
   logger.info({ sessionId: session.id, tables: liveTableIds.length }, "Running theme pass");
 
-  let raw = "";
   try {
-    raw = await callAnthropic(THEME_SYSTEM, `Workshop table digests:\n\n${digest}${existingBlock}`);
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(cleaned) as { candidates?: ThemeCandidate[] };
+    const parsed = await callAnthropicJSON<{ candidates: ThemePassCandidate[] }>(
+      THEME_SYSTEM,
+      `Workshop table digests:\n\n${digest}${existingBlock}`,
+      THEME_SCHEMA,
+    );
 
-    const incoming = Array.isArray(parsed.candidates) ? parsed.candidates : [];
+    jsonlLog({ kind: "theme_pass", session: session.id, candidateCount: parsed.candidates.length });
 
-    jsonlLog({ kind: "theme_pass", session: session.id, candidateCount: incoming.length });
+    // Every topic past this point renders on the board. Over-long ones were
+    // re-worded, not cut down; anything that still would not lay out is gone.
+    const incoming = await fitTopicsToBoard(parsed.candidates, session.id);
 
     for (const c of incoming) {
-      const topic = (c.topic ?? "").slice(0, 40);
-      if (!topic) continue;
-
+      const topic = c.topic;
       const key = candidateKey(session.id, topic);
       const existing = themeCandidates.get(key);
 
       if (existing) {
         // Merge — update confidence and evidence
         if (existing.state === "pending" || existing.state === "ready") {
-          existing.confidence = c.confidence ?? existing.confidence;
-          existing.evidence = c.evidence ?? existing.evidence;
-          existing.rationale = c.rationale ?? existing.rationale;
-          existing.seedPrompts = (c as unknown as { seed_prompts?: string[] }).seed_prompts ?? existing.seedPrompts;
+          existing.confidence = c.confidence;
+          existing.evidence = c.evidence;
+          existing.rationale = c.rationale;
+          existing.seedPrompts = c.seed_prompts;
           if (existing.confidence === "high") existing.state = "ready";
           persistThemeCandidate(existing);
         }
@@ -148,10 +320,10 @@ export async function runThemePassForSession(session: Session): Promise<boolean>
           sessionId: session.id,
           ownerId: session.ownerId,
           topic,
-          rationale: c.rationale ?? "",
-          confidence: c.confidence ?? "low",
-          evidence: c.evidence ?? [],
-          seedPrompts: (c as unknown as { seed_prompts?: string[] }).seed_prompts ?? [],
+          rationale: c.rationale,
+          confidence: c.confidence,
+          evidence: c.evidence,
+          seedPrompts: c.seed_prompts,
           state: c.confidence === "high" ? "ready" : "pending",
         };
         themeCandidates.set(key, candidate);
@@ -162,7 +334,8 @@ export async function runThemePassForSession(session: Session): Promise<boolean>
 
     return incoming.length > 0;
   } catch (err) {
-    logger.error({ err, sessionId: session.id, raw: raw.slice(0, 200) }, "Theme pass error");
+    const raw = err instanceof AnthropicResponseError ? err.raw.slice(0, 200) : undefined;
+    logger.error({ err, sessionId: session.id, raw }, "Theme pass error");
     return false;
   }
 }
