@@ -288,7 +288,7 @@
     margin-bottom: 0.75rem;
     animation: slideDown 0.2s ease-out;
   }
-  .collapsible-form.session-form { border-color: rgba(167,139,250,0.5); }
+  .collapsible-form.session-form { border-color: color-mix(in srgb, var(--purple) 50%, transparent); }
   .collapsible-form.open { display: block; }
   @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
 
@@ -426,7 +426,7 @@
   .workshop-add-session-btn {
     width: 100%;
     background: none;
-    border: 1px dashed rgba(167,139,250,0.4);
+    border: 1px dashed color-mix(in srgb, var(--purple) 40%, transparent);
     border-radius: 7px;
     padding: 0.5rem;
     font-size: 0.78rem;
@@ -442,12 +442,12 @@
   /* ── Session folders (middle level) ─────────── */
   .session-folder {
     background: var(--surface);
-    border: 1.5px solid rgba(167,139,250,0.2);
+    border: 1.5px solid color-mix(in srgb, var(--purple) 20%, transparent);
     border-radius: 9px;
     overflow: hidden;
     transition: border-color 0.15s;
   }
-  .session-folder:has(.session-body.open) { border-color: rgba(167,139,250,0.55); }
+  .session-folder:has(.session-body.open) { border-color: color-mix(in srgb, var(--purple) 55.0%, transparent); }
 
   .session-header {
     display: flex;
@@ -456,25 +456,25 @@
     padding: 0.65rem 0.85rem;
     cursor: pointer;
     user-select: none;
-    background: rgba(167,139,250,0.05);
+    background: color-mix(in srgb, var(--purple) 5%, transparent);
     transition: background 0.1s;
   }
-  .session-header:hover { background: rgba(167,139,250,0.1); }
+  .session-header:hover { background: color-mix(in srgb, var(--purple) 10%, transparent); }
   .session-chevron { font-size: 0.7rem; color: var(--purple); flex-shrink: 0; transition: transform 0.18s; }
   .session-chevron.open { transform: rotate(90deg); }
   .session-name { font-weight: 600; font-size: 0.92rem; flex: 1; color: var(--ink); }
   .session-count {
     font-size: 0.65rem;
     color: var(--purple);
-    background: rgba(167,139,250,0.12);
-    border: 1px solid rgba(167,139,250,0.35);
+    background: color-mix(in srgb, var(--purple) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--purple) 35%, transparent);
     border-radius: 100px;
     padding: 0.1rem 0.5rem;
     flex-shrink: 0;
   }
   .session-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
 
-  .session-body { display: none; border-top: 1px solid rgba(167,139,250,0.2); }
+  .session-body { display: none; border-top: 1px solid color-mix(in srgb, var(--purple) 20%, transparent); }
   .session-body.open { display: block; }
   .session-tables { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.65rem 0.85rem; }
   .session-empty {
