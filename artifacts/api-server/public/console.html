@@ -5,45 +5,77 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Facilitator Console</title>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('scribe-theme')||'light')</script>
+<link rel="stylesheet" href="./workshop.css"/>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   /* ── Light mode (default) ── */
-  :root {
-    --bg: #f8f5f0;
-    --surface: #ffffff;
-    --surface2: #f2ece4;
-    --border: #e0d4c4;
-    --text: #1a1410;
-    --muted: #7a6a58;
-    --accent: #b07010;
-    --accent2: #c44808;
-    --green: #15803d;
-    --orange: #c2520a;
-    --purple: #6d28d9;
-    --red: #b91c1c;
+  /* The facilitator console. An instrument, read under time pressure by one
+     person who is also walking a room, so it gets the quiet half of the
+     system and no theatre at all.
+
+     An ADAPTER onto workshop.css: every var(--x) call site in the file is
+     untouched and only what the names resolve to has changed. One exception,
+     made deliberately above this block -- the colour token this file called
+     --text is now --ink, because workshop.css uses --text for the font
+     stack. Both would have been in scope and the nearer one wins, so every
+     `color: var(--text)` would have resolved to a font-family string, which
+     is invalid and drops the declaration silently. pod.html already called
+     the same thing --ink.
+
+     WHY THERE IS MORE THAN ONE COLOUR HERE, when the rest of the system
+     spends its whole budget on cardinal: a facilitator scanning six tables
+     needs state at a glance, and green/amber/violet are carrying live, idle
+     and candidate. That is information, not decoration, so it stays -- but
+     muted to sit beside charcoal instead of competing with it, and red is
+     now cardinal itself so the page has one red rather than two. */
+  /* NOTE ON THE SELECTOR, which is load-bearing and was wrong once:
+     these live on .ws (the body), NOT on :root. workshop.css declares
+     --cardinal and the charcoal ramp on .ws, and custom properties inherit
+     downward only -- so an adapter on :root referencing --cardinal resolves
+     to the guaranteed-invalid value, every mapped token becomes invalid, and
+     `background: var(--accent)` silently renders transparent. It is a quiet
+     failure: the text is still there, in white, on white. Caught by looking
+     at a render, not by reading the file. */
+  .ws.console {
+    --bg:       var(--page);
+    --surface:  var(--white);
+    --surface2: var(--light);
+    --border:   var(--hair);
+    --ink:      var(--on-light);
+    --muted:    var(--on-light-60);
+    --accent:   var(--cardinal);
+    --accent2:  var(--cardinal-deep);
+
+    /* state, not brand */
+    --green:  #2f6b4f;
+    --orange: #8a5a1c;
+    --purple: #4b4470;
+    --red:    var(--cardinal);
   }
 
-  /* ── Dark mode ── */
-  html[data-theme="dark"] {
-    --bg: #0d0d0b;
-    --surface: #181816;
-    --surface2: #222220;
-    --border: #2e2e2c;
-    --text: #ede8df;
-    --muted: #88887e;
-    --accent: #f0b429;
-    --accent2: #f97316;
-    --green: #4ade80;
-    --orange: #fb923c;
-    --purple: #a78bfa;
-    --red: #f87171;
+  /* Dark is the same ramp with the ground inverted, not a second brand. */
+  html[data-theme="dark"] .ws.console {
+    --bg:       var(--xdark);
+    --surface:  var(--dark);
+    --surface2: var(--mdark);
+    --border:   var(--mdark);
+    --ink:      var(--on-dark);
+    --muted:    var(--on-dark-50);
+    --accent:   var(--cardinal-lift);
+    --accent2:  var(--cardinal);
+
+    --green:  #6fb391;
+    --orange: #d49a52;
+    --purple: #a79ad6;
+    --red:    var(--cardinal-lift);
   }
 
   body {
     background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--ink);
+    font-family: var(--text);
+    font-variant-numeric: tabular-nums;
     font-size: 14px;
     min-height: 100vh;
     padding: 1rem;
@@ -123,7 +155,7 @@
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto 0.75rem;
   }
-  .auth-welcome-name { font-weight: 700; font-size: 1rem; color: var(--text); margin-bottom: 0.2rem; }
+  .auth-welcome-name { font-weight: 700; font-size: 1rem; color: var(--ink); margin-bottom: 0.2rem; }
   .auth-welcome-email { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.5rem; }
   #btn-continue-session { margin-bottom: 0; }
   .btn-switch-user {
@@ -132,7 +164,7 @@
     margin-top: 0.9rem; text-decoration: underline;
     padding: 0; display: block; width: 100%; text-align: center;
   }
-  .btn-switch-user:hover { color: var(--text); }
+  .btn-switch-user:hover { color: var(--ink); }
   /* Header sign-out */
   #btn-signout {
     padding: 0.3rem 0.75rem; border-radius: 4px;
@@ -154,11 +186,11 @@
     flex-wrap: wrap;
   }
   header h1 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--accent);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-family: var(--display);
+    font-size: 1.35rem;
+    font-weight: 400;
+    color: var(--ink);
+    letter-spacing: -0.015em;
   }
   .header-right { display: flex; align-items: center; gap: 0.75rem; }
   #user-info {
@@ -168,7 +200,7 @@
     font-size: 0.78rem;
     color: var(--muted);
   }
-  #user-name { font-weight: 600; color: var(--text); max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #user-name { font-weight: 600; color: var(--ink); max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .btn-signout {
     background: none;
     border: 1px solid var(--border);
@@ -192,7 +224,7 @@
     font-family: inherit;
     transition: all 0.1s;
   }
-  #theme-toggle:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+  #theme-toggle:hover { background: var(--surface2); color: var(--ink); border-color: var(--accent); }
   .btn-signout:hover { background: rgba(248,113,113,0.1); color: var(--red); border-color: rgba(248,113,113,0.4); }
   #conn-status {
     font-size: 0.75rem;
@@ -237,10 +269,13 @@
   }
   .btn-new-group { background: var(--accent); color: #fff; }
   .btn-new-group:hover { opacity: 0.85; }
-  .btn-new-workshop { background: var(--surface); color: var(--accent); border: 1.5px solid var(--accent); }
-  .btn-new-workshop:hover { background: rgba(240,180,41,0.1); }
-  .btn-new-session { background: var(--surface); color: var(--purple); border: 1.5px solid rgba(167,139,250,0.5); }
-  .btn-new-session:hover { background: rgba(167,139,250,0.1); }
+  .btn-new-workshop { background: var(--surface); color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-new-workshop:hover { background: var(--surface2); }
+  /* Workshop and Session are both secondary and read identically; Group is
+     the frequent action and is the only solid button in the row. Violet is
+     reserved for theme candidates, where it carries state. */
+  .btn-new-session { background: var(--surface); color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-new-session:hover { background: var(--surface2); }
 
   /* ── Forms ──────────────────────────────────── */
   #groups-section { margin-bottom: 1.75rem; }
@@ -275,7 +310,7 @@
     font-size: 0.9rem;
     font-family: inherit;
     background: var(--bg);
-    color: var(--text);
+    color: var(--ink);
     transition: border-color 0.15s;
   }
   .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
@@ -348,7 +383,7 @@
     overflow: hidden;
     transition: border-color 0.15s;
   }
-  .workshop-folder:has(.workshop-body.open) { border-color: rgba(240,180,41,0.5); }
+  .workshop-folder:has(.workshop-body.open) { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 
   .workshop-header {
     display: flex;
@@ -357,14 +392,14 @@
     padding: 0.85rem 1rem;
     cursor: pointer;
     user-select: none;
-    background: rgba(240,180,41,0.05);
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
     transition: background 0.1s;
   }
-  .workshop-header:hover { background: rgba(240,180,41,0.1); }
+  .workshop-header:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .workshop-chevron { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; transition: transform 0.18s; }
   .workshop-chevron.open { transform: rotate(90deg); }
   .workshop-icon { font-size: 1.1rem; flex-shrink: 0; }
-  .workshop-name { font-weight: 700; font-size: 1rem; flex: 1; color: var(--text); min-width: 0; }
+  .workshop-name { font-weight: 700; font-size: 1rem; flex: 1; color: var(--ink); min-width: 0; }
   .workshop-logo {
     width: 30px; height: 30px;
     border-radius: 3px;
@@ -427,7 +462,7 @@
   .session-header:hover { background: rgba(167,139,250,0.1); }
   .session-chevron { font-size: 0.7rem; color: var(--purple); flex-shrink: 0; transition: transform 0.18s; }
   .session-chevron.open { transform: rotate(90deg); }
-  .session-name { font-weight: 600; font-size: 0.92rem; flex: 1; color: var(--text); }
+  .session-name { font-weight: 600; font-size: 0.92rem; flex: 1; color: var(--ink); }
   .session-count {
     font-size: 0.65rem;
     color: var(--purple);
@@ -532,7 +567,7 @@
     padding: 0.28rem 0.65rem;
     border: 1px solid var(--border);
     background: var(--surface);
-    color: var(--text);
+    color: var(--ink);
     cursor: pointer;
     transition: background 0.12s, color 0.12s, border-color 0.12s;
     white-space: nowrap;
@@ -541,8 +576,8 @@
   .btn-sm-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .btn-sm-primary:hover { opacity: 0.85; background: var(--accent); }
   .btn-sm-danger:hover { background: rgba(248,113,113,0.1); color: var(--red); border-color: rgba(248,113,113,0.4); }
-  .btn-sm-summary { background: rgba(240,180,41,0.1); color: var(--accent); border-color: rgba(240,180,41,0.3); }
-  .btn-sm-summary:hover { background: rgba(240,180,41,0.18); }
+  .btn-sm-summary { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+  .btn-sm-summary:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
   .btn-sm-summary:disabled { opacity: 0.5; cursor: default; }
 
   /* ── Waiting session card ───────────────────── */
@@ -568,14 +603,14 @@
     letter-spacing: 0.1em;
     padding: 0.18rem 0.5rem;
     border-radius: 100px;
-    background: rgba(240,180,41,0.12);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
     color: var(--accent);
     flex-shrink: 0;
   }
   .waiting-id {
     font-size: 0.7rem;
     color: var(--muted);
-    font-family: monospace;
+    font-family: var(--text);
     flex-shrink: 0;
   }
   .btn-delete-waiting {
@@ -601,7 +636,7 @@
   }
   .wq-item {
     font-size: 0.8rem;
-    color: var(--text);
+    color: var(--ink);
     padding-left: 0.9rem;
     position: relative;
     line-height: 1.45;
@@ -620,7 +655,7 @@
   .link-url {
     font-size: 0.75rem;
     color: var(--muted);
-    font-family: monospace;
+    font-family: var(--text);
     flex: 1;
     overflow: hidden;
     white-space: nowrap;
@@ -634,12 +669,12 @@
     padding: 0.25rem 0.6rem;
     font-size: 0.72rem;
     font-weight: 600;
-    color: var(--text);
+    color: var(--ink);
     cursor: pointer;
     transition: background 0.15s;
     font-family: inherit;
   }
-  .btn-copy:hover { background: rgba(240,180,41,0.12); border-color: var(--accent); color: var(--accent); }
+  .btn-copy:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); color: var(--accent); }
   .btn-copy.copied { background: rgba(74,222,128,0.12); border-color: var(--green); color: var(--green); }
 
   /* ── Active table cards ─────────────────────── */
@@ -651,7 +686,7 @@
     cursor: pointer;
     transition: border-color 0.15s;
   }
-  .table-card:hover { border-color: rgba(240,180,41,0.4); }
+  .table-card:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
   .table-card.expanded { border-color: var(--accent); }
 
   .table-card-summary {
@@ -663,7 +698,7 @@
   .table-id {
     font-weight: 700;
     font-size: 0.95rem;
-    color: var(--text);
+    color: var(--ink);
     flex-shrink: 0;
     max-width: 180px;
     overflow: hidden;
@@ -739,12 +774,12 @@
   }
   .cluster-block { margin-bottom: 0.6rem; }
   .cluster-name { font-weight: 600; font-size: 0.85rem; color: var(--accent); margin-bottom: 0.25rem; }
-  .idea-row { font-size: 0.8rem; color: var(--text); padding-left: 0.9rem; line-height: 1.5; position: relative; }
+  .idea-row { font-size: 0.8rem; color: var(--ink); padding-left: 0.9rem; line-height: 1.5; position: relative; }
   .idea-row::before { content: '–'; position: absolute; left: 0; color: var(--muted); }
   .quote-row { font-size: 0.8rem; font-style: italic; border-left: 2px solid var(--border); padding-left: 0.6rem; margin-bottom: 0.35rem; line-height: 1.4; }
   .flag-row { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--surface2); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem; margin: 0.2rem 0.2rem 0 0; }
   .flag-kind { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
-  .synthesis-row { font-size: 0.82rem; background: rgba(240,180,41,0.07); border-left: 3px solid var(--accent); padding: 0.5rem 0.75rem; border-radius: 0 4px 4px 0; line-height: 1.5; }
+  .synthesis-row { font-size: 0.82rem; background: color-mix(in srgb, var(--accent) 7.0%, transparent); border-left: 3px solid var(--accent); padding: 0.5rem 0.75rem; border-radius: 0 4px 4px 0; line-height: 1.5; }
 
   /* Pod link + archive row at bottom of expanded card */
   .card-bottom-actions {
@@ -775,7 +810,7 @@
   .pod-link-url {
     font-size: 0.72rem;
     color: var(--muted);
-    font-family: monospace;
+    font-family: var(--text);
     flex: 1;
     overflow: hidden;
     white-space: nowrap;
@@ -792,7 +827,7 @@
     font-size: 0.8rem;
     font-family: inherit;
     background: var(--bg);
-    color: var(--text);
+    color: var(--ink);
     cursor: pointer;
   }
   .assign-select:focus { outline: none; border-color: var(--purple); }
@@ -830,7 +865,7 @@
     border-top: 1px dashed var(--border);
     margin-top: 0.5rem;
   }
-  .archived-toggle:hover { color: var(--text); }
+  .archived-toggle:hover { color: var(--ink); }
   .archived-toggle-chevron { transition: transform 0.18s; }
   .archived-toggle-chevron.open { transform: rotate(90deg); }
   .archived-badge {
@@ -904,7 +939,7 @@
     font-size: 0.9rem;
     font-family: inherit;
     background: var(--bg);
-    color: var(--text);
+    color: var(--ink);
     transition: border-color 0.15s;
     min-width: 0;
   }
@@ -944,7 +979,7 @@
   #search-result-text {
     font-size: 0.88rem;
     line-height: 1.6;
-    color: var(--text);
+    color: var(--ink);
     white-space: pre-wrap;
   }
   #search-result-text em {
@@ -974,7 +1009,7 @@
   .conf-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.15rem 0.5rem; border-radius: 100px; font-weight: 700; }
   .conf-badge.low    { background: rgba(255,255,255,0.06); color: var(--muted); }
   .conf-badge.medium { background: rgba(249,115,22,0.12); color: var(--orange); }
-  .conf-badge.high   { background: rgba(240,180,41,0.12); color: var(--accent); }
+  .conf-badge.high   { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 
   .cand-rationale { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.6rem; line-height: 1.4; }
   .evidence-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.7rem; }
@@ -986,7 +1021,7 @@
   .btn:hover { opacity: 0.85; }
   .btn:active { transform: scale(0.97); }
   .btn-reveal  { background: var(--accent); color: #fff; }
-  .btn-edit    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-edit    { background: var(--surface2); color: var(--ink); border: 1px solid var(--border); }
   .btn-dismiss { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 
   .no-candidates { color: var(--muted); font-size: 0.85rem; padding: 1rem 0; font-style: italic; }
@@ -999,7 +1034,7 @@
     border-radius: 4px;
     padding: 0;
     background: var(--surface);
-    color: var(--text);
+    color: var(--ink);
     box-shadow: 0 20px 80px rgba(0,0,0,0.7);
     max-width: 740px;
     width: calc(100vw - 2rem);
@@ -1019,7 +1054,7 @@
     flex-shrink: 0;
   }
   .modal-header-text { flex: 1; }
-  .modal-title { font-size: 1.15rem; font-weight: 700; color: var(--text); margin-bottom: 0.2rem; }
+  .modal-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; }
   .modal-subtitle { font-size: 0.75rem; color: var(--muted); }
   .modal-close-x {
     background: none;
@@ -1032,12 +1067,12 @@
     flex-shrink: 0;
     transition: color 0.1s, background 0.1s;
   }
-  .modal-close-x:hover { color: var(--text); background: var(--surface2); }
+  .modal-close-x:hover { color: var(--ink); background: var(--surface2); }
   #modal-body {
     flex: 1;
     overflow-y: auto;
     padding: 1.1rem 1.25rem;
-    color: var(--text);
+    color: var(--ink);
     line-height: 1.65;
   }
   .modal-footer {
@@ -1068,7 +1103,7 @@
     border-bottom: 1px solid var(--border);
   }
   .md h2:first-child { margin-top: 0; }
-  .md h3 { font-size: 0.9rem; font-weight: 700; margin: 0.9rem 0 0.3rem; color: var(--text); }
+  .md h3 { font-size: 0.9rem; font-weight: 700; margin: 0.9rem 0 0.3rem; color: var(--ink); }
   .md p { margin-bottom: 0.55rem; font-size: 0.88rem; }
   .md ul { margin: 0.35rem 0 0.55rem 1.2rem; }
   .md li { font-size: 0.88rem; margin-bottom: 0.25rem; }
@@ -1083,7 +1118,7 @@
   }
 </style>
 </head>
-<body>
+<body class="ws console">
 
 <!-- ── Auth overlay ────────────────────────────── -->
 <div id="auth-overlay">
@@ -1124,20 +1159,20 @@
       display:inline-flex;align-items:center;gap:0.4rem;
       padding:0.35rem 0.75rem;border-radius:4px;
       border:1px solid var(--border);background:var(--surface);
-      color:var(--text);text-decoration:none;font-family:inherit;
+      color:var(--ink);text-decoration:none;font-family:inherit;
       font-size:0.78rem;letter-spacing:0.05em;cursor:pointer;
       white-space:nowrap;transition:background 0.15s;
-    " onmouseover="this.style.background='rgba(240,180,41,0.12)'" onmouseout="this.style.background='var(--surface)'">
+    " onmouseover="this.style.background='color-mix(in srgb, var(--accent) 12%, transparent)'" onmouseout="this.style.background='var(--surface)'">
       ▦ Board
     </a>
     <a href="admin.html" target="_blank" id="btn-admin" style="
       display:none;align-items:center;gap:0.4rem;
       padding:0.35rem 0.75rem;border-radius:4px;
       border:1px solid var(--border);background:var(--surface);
-      color:var(--amber,#f0b429);text-decoration:none;font-family:inherit;
+      color:var(--accent);text-decoration:none;font-family:inherit;
       font-size:0.78rem;letter-spacing:0.05em;cursor:pointer;
       white-space:nowrap;transition:background 0.15s;
-    " onmouseover="this.style.background='rgba(240,180,41,0.12)'" onmouseout="this.style.background='var(--surface)'">
+    " onmouseover="this.style.background='color-mix(in srgb, var(--accent) 12%, transparent)'" onmouseout="this.style.background='var(--surface)'">
       ⚙ Admin
     </a>
     <button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>

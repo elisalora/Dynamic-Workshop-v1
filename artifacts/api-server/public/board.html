@@ -4,237 +4,407 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Discussion Board</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
-<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('scribe-theme')||'light')</script>
+<!-- No Google Fonts link. The faces are in ./fonts and declared in
+     workshop.css. A CDN request from a display standing in a private
+     workshop sends a referrer, which is a third-party log of when that
+     workshop was running. -->
+<link rel="stylesheet" href="./workshop.css"/>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ============================================================
+     The board is the one surface a whole room looks at, in the
+     dark, from the back wall. Everything here follows from that:
 
-  :root {
-    --b-bg:       #f5f0e8;
-    --b-tile:     #faf7f2;
-    --b-char:     #1a1410;
-    --b-grid:     #d4c4a8;
-    --b-lo:       rgba(0,0,0,0.08);
-    --b-hi:       rgba(255,255,255,0.8);
-    --b-split:    rgba(0,0,0,0.12);
-    --b-mid:      #e8dfc8;
-    --b-shadow:   0 4px 24px rgba(0,0,0,0.15);
-    --b-inset:    rgba(0,0,0,0.06);
-    --b-title:    #4a4038;
-    --b-status:   #a09070;
-    --b-prompt:   #7a6040;
-    --b-arrow:    #b07010;
-  }
-  html[data-theme="dark"] {
-    --b-bg:       #0d0d0b;
-    --b-tile:     #141412;
-    --b-char:     #f0b429;
-    --b-grid:     #060604;
-    --b-lo:       rgba(0,0,0,0.6);
-    --b-hi:       rgba(255,255,255,0.03);
-    --b-split:    rgba(0,0,0,0.8);
-    --b-mid:      #0a0a08;
-    --b-shadow:   0 12px 64px rgba(0,0,0,0.7);
-    --b-inset:    rgba(240,180,41,0.1);
-    --b-title:    #555550;
-    --b-status:   #3a3a36;
-    --b-prompt:   #666660;
-    --b-arrow:    #f0b429;
-  }
+     - It is always dark. There is no theme toggle. A projected
+       board has one lighting condition, and the toggle that used
+       to sit here rendered as a raw browser button (Arial,
+       rgb(239,239,239), 2px outset) in the middle of a projection.
+     - Nothing is sized in rem. Every dimension derives from
+       --board-w, which derives from the viewport, so the board is
+       the same fraction of a laptop screen and a 4K projector.
+       The old rule was `clamp(0.7rem, 2.2vw, 1.3rem)`, whose 1.3rem
+       ceiling saturated above ~945px wide — so every projector,
+       at any resolution, drew 20.8px letters.
+     - Contrast is budgeted, not chosen. The old prompts measured
+       3.37:1 on the dark ground and the status line 1.70:1, which
+       is where the connection errors print.
+     ============================================================ */
 
-  body {
-    background: var(--b-bg);
-    color: var(--b-char);
-    font-family: 'Space Mono', 'Courier New', monospace;
+  .ws.ws-stage {
+    /* Grid geometry. ONE declaration, read by CSS and by the script
+       below through getComputedStyle — not two constants that agree
+       today.
+
+       SEAM, open: artifacts/api-server/src/board-format.ts (Marzipan,
+       branch honey/board-topic-fit) declares BOARD_ROWS=3 BOARD_COLS=15
+       and wraps topic text to that, deliberately targeting the smaller
+       Vestaboard Note so a topic fits either board. This display is the
+       flagship 6x22, which is what main ships. The two disagree and
+       neither file knows it. Left at 6x22 so this pass changes no
+       behaviour; raised rather than decided. */
+    --cols: 22;
+    --rows: 6;
+
+    --tile-ar: 0.65;                 /* w/h of one flap */
+
+    /* Everything outside the plate -- masthead, the gap under it, up to three
+       prompts, the footer -- is expressed in multiples of --cell, and they add
+       up to this many. Measured off a render, not guessed, and re-measured by
+       the guard at four prompt counts and three grid geometries.
+
+       It deliberately does NOT depend on --rows or --cols. The first version
+       of this fix was a flat vh constant, tuned by hand against the 6x22 grid.
+       It was correct, and it was a trap: dropping in the 3x15 geometry that
+       board-format.ts targets pushed the prompts straight back off the bottom,
+       because a height budget tuned for one geometry says nothing about the
+       next one. (Named rather than quoted: this file's own guard greps for the
+       old token, and a comment reproducing it would fail as an assertion.) */
+    --extras: 8.52;
+
+    /* As wide as the plate can be while everything still fits:
+         plate height    = board_w * rows / (cols * tile_ar)
+         everything else = extras * cell = extras * board_w / cols
+       solved for board_w against the viewport height. One expression, no magic
+       number per geometry. The var() fallbacks at the use sites cover a browser
+       without CSS Values 4 division (pre Chrome 111 / Safari 16.4), where this
+       declaration is invalid and --board-w simply never resolves. */
+    --board-w: min(94vw, calc(100vh * var(--cols)
+                              / (var(--rows) / var(--tile-ar) + var(--extras))));
+    --cell: calc(var(--board-w) / var(--cols));
+    --gap: calc(var(--cell) * 0.06);
+
+    margin: 0;
+    background: var(--xdark);
+    color: var(--on-dark);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
     overflow: hidden;
     user-select: none;
+    cursor: default;
   }
 
-  #unlock-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--b-bg);
+  /* ── Masthead ───────────────────────────────────
+     Deadpan institutional: the plate below announces what one table
+     of eight said about sign-off, and the furniture around it is a
+     departures board. The joke only works played straight, so the
+     type is the label voice and nothing winks. */
+  .ws-stage .masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2vw;
+    padding: calc(var(--cell) * 0.6) calc(var(--cell) * 0.8);
+    border-bottom: 1px solid var(--on-dark-10);
+    flex: 0 0 auto;
+  }
+  .ws-stage .masthead .label {
+    font-size: calc(var(--cell) * 0.28);
+    color: var(--on-dark-50);
+    letter-spacing: 0.22em;
+  }
+  .ws-stage .masthead .label b {
+    color: var(--on-dark-75);
+    font-weight: 500;
+  }
+  .ws-stage #clock {
+    font-family: var(--display);
+    font-size: calc(var(--cell) * 0.52);
+    letter-spacing: -0.01em;
+    color: var(--on-dark-50);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ws-stage .centre {
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1.5rem;
-    z-index: 1000;
-    cursor: pointer;
-  }
-  #unlock-overlay h2 {
-    font-size: 1rem;
-    color: var(--b-arrow);
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-  }
-  #unlock-overlay p {
-    color: var(--b-status);
-    font-size: 0.72rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    gap: calc(var(--cell) * 0.75);
+    padding: calc(var(--cell) * 0.5) 0;
+    min-height: 0;
   }
 
-  #board-wrap {
-    padding: 2rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.75rem;
-    width: 100%;
-  }
-
-  #board-title {
-    font-size: 0.6rem;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--b-title);
-    text-align: center;
-  }
-
-  /* ── Flip board ─────────────────────── */
-  #flip-board {
+  /* ── The plate ──────────────────────────────────
+     A real split-flap board is one object, and its blank flaps are
+     part of it. The old board drew blanks in the same tone as the
+     ground, so on dark the whole device dissolved and the two lines
+     of text floated in nothing. The bezel and the inset shadow are
+     what make 132 flaps read as one machine sitting in the room. */
+  .ws-stage #flip-board {
     display: grid;
-    grid-template-columns: repeat(22, 1fr);
-    gap: 3px;
-    background: var(--b-grid);
-    padding: 8px;
-    border-radius: 3px;
-    box-shadow: var(--b-shadow), inset 0 0 0 1px var(--b-inset);
-    width: 100%;
-    max-width: 900px;
+    grid-template-columns: repeat(var(--cols), 1fr);
+    gap: var(--gap);
+    width: var(--board-w, 94vw);
+    padding: calc(var(--cell) * 0.22);
+    background: #000;
+    border-radius: calc(var(--cell) * 0.1);
+    box-shadow:
+      0 0 0 1px var(--on-dark-10),
+      0 calc(var(--cell) * 0.5) calc(var(--cell) * 1.6) rgba(0,0,0,0.85),
+      inset 0 0 calc(var(--cell) * 0.8) rgba(0,0,0,0.9);
+    flex: 0 0 auto;
   }
 
-  .tile {
-    aspect-ratio: 0.65;
-    background: var(--b-tile);
-    border-radius: 2px;
+  .ws-stage .tile {
+    aspect-ratio: var(--tile-ar);
+    background: var(--dark);
+    border-radius: calc(var(--cell) * 0.05);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: clamp(0.7rem, 2.2vw, 1.3rem);
-    font-weight: 700;
-    color: var(--b-char);
+    font-family: var(--text);
+    font-weight: 600;
+    font-size: calc(var(--cell) * 0.62);
+    line-height: 1;
+    color: var(--on-dark);
     position: relative;
     overflow: hidden;
-    box-shadow: inset 0 -1px 0 var(--b-lo), inset 0 1px 0 var(--b-hi);
+    box-shadow:
+      inset 0 calc(var(--cell) * -0.03) 0 rgba(0,0,0,0.55),
+      inset 0 calc(var(--cell) *  0.03) 0 rgba(255,255,255,0.045);
+    will-change: transform;
   }
 
-  /* Horizontal split line — the signature Vestaboard detail */
-  .tile::after {
+  /* the hinge — the detail that says split-flap and not spreadsheet */
+  .ws-stage .tile::after {
     content: '';
     position: absolute;
-    left: 0; right: 0;
-    top: 50%;
-    height: 1px;
-    background: var(--b-split);
+    left: 0; right: 0; top: 50%;
+    height: max(1px, calc(var(--cell) * 0.018));
+    background: #000;
+    opacity: 0.85;
     pointer-events: none;
   }
 
-  .tile.flipping {
-    animation: flip 0.18s ease-in-out;
-  }
+  /* The reveal is column-staggered, so flashing cardinal at the
+     midpoint of each flip sends one red wave across the board.
+     That is the whole showpiece and it costs a keyframe. */
+  .ws-stage .tile.flipping { animation: ws-flip 0.18s ease-in-out; }
 
-  @keyframes flip {
+  @keyframes ws-flip {
     0%   { transform: scaleY(1); }
-    50%  { transform: scaleY(0); background: var(--b-mid); }
+    50%  { transform: scaleY(0.04); background: var(--cardinal); color: var(--cardinal); }
     100% { transform: scaleY(1); }
   }
 
-  /* ── Prompts ────────────────────────── */
-  #prompts-area {
-    text-align: center;
-    min-height: 5rem;
-    max-width: 700px;
-    width: 100%;
+  /* ── Prompts ────────────────────────────────────
+     Not board content — the facilitator's follow-ups. They get their
+     own register so the plate stays pure mechanism: General Sans,
+     left-aligned on a shared rule, each led by a cardinal marker.
+     Colour is --on-dark-75, which measures 12.6:1 on this ground;
+     the old #666660 measured 3.37:1 and failed AA. */
+  .ws-stage #prompts-area {
+    width: var(--board-w, 94vw);
+    max-width: 94vw;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--cell) * 0.18);
+    flex: 0 0 auto;
   }
-
-  .prompt-item {
-    font-size: clamp(0.72rem, 1.6vw, 0.95rem);
-    color: #666660;
-    line-height: 1.7;
-    padding: 0.35rem 0;
+  .ws-stage .prompt-item {
+    font-family: var(--text);
+    font-weight: 400;
+    font-size: calc(var(--cell) * 0.4);
+    line-height: 1.45;
+    color: var(--on-dark-75);
+    padding-left: calc(var(--cell) * 0.9);
+    position: relative;
     opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
-    letter-spacing: 0.04em;
+    transform: translateY(calc(var(--cell) * 0.2));
+    transition: opacity .5s ease, transform .5s ease;
   }
-  .prompt-item.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .prompt-item::before {
-    content: '→ ';
-    color: #f0b429;
+  .ws-stage .prompt-item.visible { opacity: 1; transform: translateY(0); }
+  .ws-stage .prompt-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: calc(var(--cell) * 0.5);
+    height: max(2px, calc(var(--cell) * 0.045));
+    background: var(--cardinal-lift);
   }
 
-  /* ── Status ─────────────────────────── */
-  #board-status {
-    font-size: 0.58rem;
-    letter-spacing: 0.28em;
+  /* ── Footer status ──────────────────────────────
+     Carries the connection errors, so it is the line that most needs
+     to be readable and used to be the least: 1.70:1. --on-dark-50 is
+     7.4:1 here. The wording of the error strings is unchanged — it
+     names which half of the link is missing, and that is load-bearing. */
+  .ws-stage .footer {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--cell) * 0.5);
+    padding: calc(var(--cell) * 0.5) calc(var(--cell) * 0.8);
+    border-top: 1px solid var(--on-dark-10);
+    flex: 0 0 auto;
+  }
+  .ws-stage #board-status {
+    font-family: var(--text);
+    font-weight: 500;
+    font-size: calc(var(--cell) * 0.28);
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #3a3a36;
+    color: var(--on-dark-50);
+  }
+  .ws-stage #board-status.alert { color: var(--cardinal-lift); }
+
+  .ws-stage .lamp {
+    width: calc(var(--cell) * 0.2);
+    height: calc(var(--cell) * 0.2);
+    border-radius: 50%;
+    background: var(--on-dark-25);
+    flex: 0 0 auto;
+  }
+  .ws-stage .lamp.live {
+    background: var(--cardinal-lift);
+    box-shadow: 0 0 calc(var(--cell) * 0.4) var(--cardinal-lift);
+    animation: ws-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes ws-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
+
+  /* ── Audio unlock ───────────────────────────────
+     Kept, because the flaps have to click and a browser will not make
+     a sound until someone has clicked. Restyled so the thing a room
+     sees before the workshop starts is a title card, not a dialog. */
+  .ws-stage #unlock-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--xdark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    z-index: 1000;
+    cursor: pointer;
     text-align: center;
+    padding: 6vw;
+  }
+  .ws-stage #unlock-overlay h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(38px, 7vw, 108px);
+    letter-spacing: -0.02em;
+    line-height: 1.02;
+    color: var(--on-dark);
+    margin: 0;
+  }
+  .ws-stage #unlock-overlay .rule {
+    width: clamp(60px, 9vw, 140px);
+    height: 3px;
+    background: var(--cardinal-lift);
+  }
+  .ws-stage #unlock-overlay p {
+    font-family: var(--text);
+    font-weight: 500;
+    font-size: clamp(11px, 1.1vw, 15px);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--on-dark-50);
+    margin: 0;
+  }
+
+  /* A board is pointed at a room, never at a phone. But a facilitator
+     checks the link on one first, and a board that is unreadable there
+     reads as broken. Below 640px the flaps would be under 25px wide,
+     so the plate scrolls horizontally at a usable size rather than
+     shrinking to nothing. */
+  @media (max-width: 640px) {
+    .ws.ws-stage { --board-w: 150vw; overflow-x: auto; }
+    .ws-stage .centre { align-items: flex-start; }
   }
 </style>
 </head>
-<body>
+<body class="ws ws-stage">
 
 <div id="unlock-overlay">
-  <h2>Split-Flap Board</h2>
-  <p>Click anywhere to enable audio</p>
+  <h2>Discussion Board</h2>
+  <div class="rule"></div>
+  <p>Click anywhere to start the board</p>
 </div>
 
-<div id="board-wrap">
-  <div id="board-title">SCRIBE PILOT · DISCUSSION BOARD</div>
+<header class="masthead">
+  <div class="label">Dynamic Workshop <b>&middot; Discussion Board</b></div>
+  <div id="clock">--:--</div>
+</header>
 
+<main class="centre">
   <div id="flip-board"></div>
-
   <div id="prompts-area"></div>
-  <div id="board-status">Waiting for facilitator…</div>
-</div>
+</main>
 
-<button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>
-
-<script>
-// ── Theme toggle ──────────────────────────────
-window._toggleTheme = function() {
-  var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('scribe-theme', next);
-  var btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = next === 'dark' ? '☀ Light' : '☾ Dark';
-};
-(function() {
-  var t = document.documentElement.getAttribute('data-theme') || 'light';
-  var btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = t === 'dark' ? '☀ Light' : '☾ Dark';
-})();
-</script>
+<footer class="footer">
+  <span class="lamp" id="lamp"></span>
+  <span id="board-status">Waiting for facilitator&hellip;</span>
+</footer>
 
 <script>
 (function() {
-  const ROWS = 6;
-  const COLS = 22;
+  // Geometry is declared once, in CSS, and read back here. Two constants
+  // that happen to agree is how a grid and its renderer drift apart.
+  const stage = document.body;
+  const readInt = (name, fallback) => {
+    const v = parseInt(getComputedStyle(stage).getPropertyValue(name), 10);
+    return Number.isFinite(v) ? v : fallback;
+  };
+  const ROWS = readInt('--rows', 6);
+  const COLS = readInt('--cols', 22);
+
   const CHARSET = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?!-:/\'';
   const FLIP_DELAY_PER_COL = 35; // ms stagger between columns
-  const FLIPS_PER_TILE = 6;      // how many random chars before settling
+  const FLIPS_PER_TILE = 6;      // random chars before settling
   const FLIP_DURATION = 180;     // ms per flip animation
 
   let audioCtx = null;
   let audioUnlocked = false;
+  let noiseBuf = null;
+
+  const statusEl = document.getElementById('board-status');
+  const lampEl   = document.getElementById('lamp');
+
+  function setStatus(text, opts) {
+    opts = opts || {};
+    statusEl.textContent = text;
+    statusEl.classList.toggle('alert', !!opts.alert);
+    lampEl.classList.toggle('live', !!opts.live);
+  }
+
+  // ── Clock ──────────────────────────────────
+  // The one piece of furniture that makes the plate read as a
+  // departures board rather than a slide. Local time, no seconds —
+  // a seconds digit on a wall display is a thing people watch.
+  (function clock() {
+    const el = document.getElementById('clock');
+    function tick() {
+      const d = new Date();
+      el.textContent = String(d.getHours()).padStart(2, '0') + ':' +
+                       String(d.getMinutes()).padStart(2, '0');
+    }
+    tick();
+    setInterval(tick, 10000);
+  })();
 
   // ── Unlock audio on click ──────────────────
   const overlay = document.getElementById('unlock-overlay');
   overlay.addEventListener('click', () => {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioUnlocked = true;
+    // A failed AudioContext used to leave the overlay up forever, which
+    // looks exactly like a dead board. The board works silently; the
+    // overlay comes down either way.
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // One noise buffer, made once and replayed. A split-flap click is a
+      // broadband transient, not a tone — the old square-wave oscillator
+      // at a random pitch per flap read as a game, not a machine. 792
+      // flips per reveal also makes per-flip oscillator creation worth
+      // avoiding.
+      const n = Math.floor(audioCtx.sampleRate * 0.05);
+      noiseBuf = audioCtx.createBuffer(1, n, audioCtx.sampleRate);
+      const ch = noiseBuf.getChannelData(0);
+      for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1);
+      audioUnlocked = true;
+    } catch {
+      audioUnlocked = false;
+    }
     overlay.style.transition = 'opacity 0.5s';
     overlay.style.opacity = '0';
     setTimeout(() => overlay.remove(), 500);
@@ -256,20 +426,23 @@ window._toggleTheme = function() {
     tiles.push(row);
   }
 
-  // ── Sound synthesis ────────────────────────
+  // ── Sound ──────────────────────────────────
   function playClick() {
-    if (!audioUnlocked || !audioCtx) return;
+    if (!audioUnlocked || !audioCtx || !noiseBuf) return;
     try {
-      const osc = audioCtx.createOscillator();
+      const src  = audioCtx.createBufferSource();
+      const bp   = audioCtx.createBiquadFilter();
       const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(220 + Math.random() * 440, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-      osc.start(audioCtx.currentTime);
-      osc.stop(audioCtx.currentTime + 0.05);
+      src.buffer = noiseBuf;
+      bp.type = 'bandpass';
+      bp.frequency.value = 1400 + Math.random() * 900;
+      bp.Q.value = 1.6;
+      src.connect(bp); bp.connect(gain); gain.connect(audioCtx.destination);
+      const t = audioCtx.currentTime;
+      gain.gain.setValueAtTime(0.05, t);
+      gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.045);
+      src.start(t);
+      src.stop(t + 0.05);
     } catch {}
   }
 
@@ -302,7 +475,7 @@ window._toggleTheme = function() {
 
   // ── Reveal text on board ───────────────────
   function reveal(text, prompts) {
-    document.getElementById('board-status').textContent = '';
+    setStatus('Revealing', { live: true });
 
     // Word-wrap text into rows of COLS
     const words = text.toUpperCase().split(/\s+/);
@@ -322,6 +495,11 @@ window._toggleTheme = function() {
       }
     }
     if (currentRow) rows.push(currentRow);
+
+    // Over ROWS lines, the board shows part of a theme and says nothing
+    // about it. Unchanged behaviour — it still truncates, because what to
+    // do instead is a content decision — but the room is told.
+    const overflowed = rows.length > ROWS;
 
     // Center each content row horizontally, truncate if over COLS
     const contentRows = rows.slice(0, ROWS).map(row => {
@@ -344,14 +522,12 @@ window._toggleTheme = function() {
       );
     }
 
-    const flipPromises = [];
-
     // Column-staggered flip
     for (let c = 0; c < COLS; c++) {
       const colDelay = c * FLIP_DELAY_PER_COL;
       for (let r = 0; r < ROWS; r++) {
         const targetChar = centeredRows[r][c] ?? ' ';
-        flipPromises.push(flipTile(tiles[r][c], targetChar, colDelay));
+        flipTile(tiles[r][c], targetChar, colDelay);
       }
     }
 
@@ -359,6 +535,8 @@ window._toggleTheme = function() {
     const maxDelay = COLS * FLIP_DELAY_PER_COL + FLIPS_PER_TILE * FLIP_DURATION;
     setTimeout(() => {
       showPrompts(prompts || []);
+      setStatus(overflowed ? 'On the board · headline truncated' : 'On the board',
+                { live: true, alert: overflowed });
     }, maxDelay + 300);
   }
 
@@ -398,9 +576,10 @@ window._toggleTheme = function() {
       // Naming the missing half matters: an old bookmarked board URL has a
       // session and no key, and "no session" would send someone hunting for
       // the wrong thing. Either way the fix is to reopen it from the console.
-      document.getElementById('board-status').textContent =
+      setStatus(
         (sessionId ? 'no board key' : 'no session') +
-        ' — open this board from a session in the facilitator console';
+        ' — open this board from a session in the facilitator console',
+        { alert: true });
       return;
     }
 
@@ -409,7 +588,7 @@ window._toggleTheme = function() {
     const ws    = new WebSocket(`${proto}//${location.host}${base}/ws?role=board&session=${encodeURIComponent(sessionId)}&key=${encodeURIComponent(boardKey)}`);
 
     ws.addEventListener('open', () => {
-      document.getElementById('board-status').textContent = 'connected · waiting for facilitator…';
+      setStatus('Connected · waiting for facilitator…', { live: true });
     });
 
     ws.addEventListener('message', (evt) => {
@@ -427,12 +606,13 @@ window._toggleTheme = function() {
       // session whose board key has moved on. Reconnecting will keep failing,
       // so stop and say which it was rather than spin.
       if (evt.code === 1008) {
-        document.getElementById('board-status').textContent =
+        setStatus(
           (evt.reason || 'refused').toLowerCase() +
-          ' — reopen this board from the facilitator console';
+          ' — reopen this board from the facilitator console',
+          { alert: true });
         return;
       }
-      document.getElementById('board-status').textContent = 'reconnecting…';
+      setStatus('Reconnecting…', { alert: true });
       setTimeout(connect, 2000);
     });
   }

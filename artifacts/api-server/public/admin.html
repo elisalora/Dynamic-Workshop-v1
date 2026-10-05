@@ -4,67 +4,116 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Admin — Scribe Pilot</title>
+<link rel="stylesheet" href="./workshop.css"/>
 <style>
-  :root {
-    --bg: #0a0a0a; --surface: #141414; --border: #2a2a2a;
-    --text: #e8e0d0; --muted: #888; --amber: #f0b429;
-    --red: #e53e3e; --green: #38a169;
+  /* Admin is an instrument, not a stage. It gets the quiet half of the
+     system: charcoal plates, General Sans, and cardinal used exactly once —
+     on the irreversible actions. That is the whole colour budget.
+
+     The page used to run an amber accent on headings, buttons, notices,
+     badges and the spinner, with a separate red for danger: two reds on one
+     page, and the colour carried no information because it was on
+     everything. Here the only coloured thing is the only thing you cannot
+     undo, which also makes the page readable without relying on hue.
+     (The old hex is named in the commit message, not quoted here — this
+     repo's guards grep for banned literals and a comment reproducing one
+     reads to them exactly like the defect.)
+
+     Tokens come from workshop.css so cardinal means the same thing here, in
+     board.html, and in the event platform's portal.css. */
+  .admin * { margin: 0; padding: 0; }
+
+  .ws.admin {
+    --surface: var(--dark);
+    --border:  var(--mdark);
+    --muted:   var(--on-dark-50);
+    --danger:  var(--cardinal-lift);
+
+    background: var(--xdark);
+    color: var(--on-dark);
+    font-family: var(--text);
+    font-variant-numeric: tabular-nums;
+    min-height: 100vh;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
-  header {
+
+  .admin header {
     background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 1rem;
+    padding: 0.85rem 1.5rem; display: flex; align-items: center; gap: 1rem;
   }
-  header h1 { font-size: 1rem; letter-spacing: 0.1em; color: var(--amber); }
-  header a { color: var(--muted); text-decoration: none; font-size: 0.8rem; }
-  header a:hover { color: var(--text); }
-  main { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
-  h2 { font-size: 0.9rem; letter-spacing: 0.1em; color: var(--amber); margin-bottom: 1rem; text-transform: uppercase; }
-  .card {
+  .admin header h1 {
+    font-family: var(--display); font-weight: 400; font-size: 1.15rem;
+    letter-spacing: -0.015em; color: var(--on-dark);
+  }
+  .admin header a { color: var(--muted); text-decoration: none; font-size: 0.82rem; }
+  .admin header a:hover { color: var(--on-dark); }
+  .admin main { max-width: 900px; margin: 2.5rem auto; padding: 0 1.5rem; }
+  .admin h2 {
+    font-weight: 500; font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 1rem;
+  }
+  .admin .card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; padding: 1.25rem; margin-bottom: 1.5rem;
+    border-radius: var(--r); padding: 1.35rem; margin-bottom: 1.5rem;
   }
-  .card p { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-  th { text-align: left; color: var(--muted); font-weight: normal; padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); letter-spacing: 0.05em; }
-  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  .role-badge {
-    display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px;
-    font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;
+  .admin .card p { color: var(--muted); font-size: 0.86rem; margin-bottom: 1rem; }
+  .admin table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .admin th {
+    text-align: left; color: var(--muted); font-weight: 500; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border);
   }
-  .role-admin { background: rgba(240,180,41,0.15); color: var(--amber); border: 1px solid rgba(240,180,41,0.3); }
-  .role-facilitator { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
-  button.btn {
-    padding: 0.3rem 0.65rem; border-radius: 4px; font-family: inherit;
-    font-size: 0.75rem; letter-spacing: 0.05em; cursor: pointer;
-    border: 1px solid var(--border); background: var(--bg); color: var(--text);
-    transition: background 0.15s;
+  .admin td {
+    padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--on-dark-10);
+    vertical-align: middle;
   }
-  button.btn:hover { background: rgba(240,180,41,0.1); border-color: var(--amber); }
-  button.btn-danger { color: var(--red); }
-  button.btn-danger:hover { background: rgba(229,62,62,0.1); border-color: var(--red); }
-  .action-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
-  .notice {
-    padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.82rem;
-    background: rgba(240,180,41,0.08); border: 1px solid rgba(240,180,41,0.3);
-    color: var(--amber); margin-bottom: 1rem;
+  .admin tr:last-child td { border-bottom: none; }
+  .admin .role-badge {
+    display: inline-block; padding: 0.18rem 0.5rem; border-radius: 3px;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
   }
-  .notice.red { background: rgba(229,62,62,0.08); border-color: rgba(229,62,62,0.3); color: var(--red); }
-  .notice.green { background: rgba(56,161,105,0.08); border-color: rgba(56,161,105,0.3); color: var(--green); }
-  #auth-overlay {
-    position: fixed; inset: 0; background: var(--bg);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; z-index: 999;
+  /* An admin reads as an outline, a facilitator as plain text. The
+     difference is weight and a rule, not hue. */
+  .admin .role-admin { color: var(--on-dark); border: 1px solid var(--on-dark-25); }
+  .admin .role-facilitator { color: var(--muted); border: 1px solid transparent; }
+  .admin button.btn {
+    padding: 0.35rem 0.7rem; border-radius: 6px; font-family: inherit;
+    font-size: 0.78rem; font-weight: 500; letter-spacing: 0.02em; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--on-dark);
+    transition: background 0.15s, border-color 0.15s;
   }
-  #auth-overlay p { color: var(--muted); font-size: 0.85rem; }
-  #auth-overlay.hidden { display: none; }
-  .spinner { width: 1.5rem; height: 1.5rem; border: 2px solid var(--border); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .admin button.btn:hover { background: var(--on-dark-10); border-color: var(--on-dark-25); }
+  .admin button.btn-danger { color: var(--danger); border-color: rgba(196,88,74,0.35); }
+  .admin button.btn-danger:hover { background: rgba(196,88,74,0.12); border-color: var(--danger); }
+  .admin .action-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .admin .notice {
+    padding: 0.8rem 1rem; border-radius: 6px; font-size: 0.85rem;
+    background: var(--on-dark-10); border: 1px solid var(--border);
+    color: var(--on-dark); margin-bottom: 1rem;
+  }
+  /* .red and .green stay as class names because the markup and the script
+     set them; what changed is that neither carries its meaning on hue alone.
+     Both already contain a sentence saying what happened. */
+  .admin .notice.red {
+    background: rgba(196,88,74,0.10); border-color: rgba(196,88,74,0.35); color: var(--danger);
+  }
+  .admin .notice.green { border-color: var(--on-dark-25); color: var(--on-dark); }
+  .admin #auth-overlay {
+    position: fixed; inset: 0; background: var(--xdark);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1rem; z-index: 999;
+  }
+  .admin #auth-overlay p { color: var(--muted); font-size: 0.86rem; }
+  .admin #auth-overlay.hidden { display: none; }
+  .admin .spinner {
+    width: 1.5rem; height: 1.5rem; border: 2px solid var(--border);
+    border-top-color: var(--on-dark-50); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .stat { font-size: 0.75rem; color: var(--muted); }
+  .admin .stat { font-size: 0.78rem; color: var(--muted); }
 </style>
 </head>
-<body>
+<body class="ws admin">
 
 <div id="auth-overlay">
   <div class="spinner"></div>
@@ -72,8 +121,8 @@
 </div>
 
 <header>
-  <h1>⚙ ADMIN</h1>
-  <a href="console.html">← Console</a>
+  <h1>Admin</h1>
+  <a href="console.html">Console</a>
 </header>
 
 <main id="main-content" style="display:none">
@@ -82,7 +131,7 @@
     <h2>Unowned Data</h2>
     <p>Workshops, sessions and groups created before multi-tenancy was enabled have no owner. Use the button below to claim them all under your account.</p>
     <div class="action-row">
-      <button class="btn" onclick="claimData()">⬇ Claim all unowned data</button>
+      <button class="btn" onclick="claimData()">Claim all unowned data</button>
     </div>
     <div id="claim-result"></div>
   </div>

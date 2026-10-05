@@ -1,0 +1,174 @@
+/* ============================================================
+   Dynamic Workshop — the shared design layer.
+
+   WHY THIS FILE EXISTS
+   Before it, each page carried its own token block and each one
+   meant something different by `--accent`: a different amber in
+   each of board.html, pod.html and console.html, while the event
+   platform this is meant to fold into means a green by it in
+   globals.css and cardinal in portal.css. Five definitions of one
+   word across two repos that are supposed to become one product.
+   Detection is the backstop; one file is the fix.
+
+   The old hex values are deliberately named and not quoted here.
+   A sweep for a retired literal greps the whole directory, and a
+   comment reproducing one is indistinguishable from the defect —
+   which has already cost this pass two false failures.
+
+   WHERE THE VALUES COME FROM
+   Lifted, not eyeballed, from event-platform/src/app/portal.css —
+   which was itself read off dafaistudio.com's stylesheet. The
+   names are identical on both sides on purpose: a value change
+   is a copy, and a reader can see at a glance that the two are
+   one system.
+
+   SCOPING
+   Every rule is under `.ws`, the same guarantee portal.css takes
+   with `.portal`. The two stylesheets both define `.card` and
+   `.label` and mean different things by them; scoping means the
+   collision cannot happen at all — for the names they share today
+   and for any either side adds later. A name-by-name audit cannot
+   promise that.
+
+   TWO REGISTERS, ONE PALETTE
+   `.ws`          — the instruments. Console, pod, admin. Light
+                    page, charcoal plates, cardinal used once.
+                    A facilitator reads these under pressure and
+                    polish would be noise.
+   `.ws.ws-stage` — the board. The one surface a whole room looks
+                    at, in the dark, from thirty feet. Same tokens,
+                    inverted ground, and the only place in the
+                    product that is allowed to be theatre.
+
+   FONTS ARE SELF-HOSTED. No CDN. board.html used to pull Space
+   Mono from fonts.googleapis.com on every load, which sends a
+   referrer — a log, at a third party, of when a private workshop
+   was running and from where. 124 KB of woff2 in ./fonts removes
+   the request entirely. Same argument the portal already made.
+   ============================================================ */
+
+@font-face {
+  font-family: 'General Sans';
+  src: url('./fonts/GeneralSans-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'General Sans';
+  src: url('./fonts/GeneralSans-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'General Sans';
+  src: url('./fonts/GeneralSans-600.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Sentient';
+  src: url('./fonts/Sentient-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Sentient';
+  src: url('./fonts/Sentient-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+
+.ws {
+  /* surface — DAF charcoal ramp */
+  --xdark:  #121212;
+  --dark:   #181818;
+  --mdark:  #2b2a2a;
+  --light:  #ededed;
+  --page:   #f5f5f4;
+  --white:  #ffffff;
+
+  /* the only colour in the system */
+  --cardinal:      #7b241c;
+  --cardinal-deep: #4a140f;
+  /* cardinal is unreadable on charcoal; this is the same red lifted
+     to carry on a dark plate. Keep it a token — the moment it is a
+     literal in two rules it becomes two slightly different colours. */
+  --cardinal-lift: #c4584a;
+
+  /* type on dark */
+  --on-dark:       #ffffff;
+  --on-dark-75:    rgba(255,255,255,.75);
+  --on-dark-50:    rgba(255,255,255,.50);
+  --on-dark-25:    rgba(255,255,255,.25);
+  --on-dark-10:    rgba(255,255,255,.10);
+
+  /* type on light */
+  --on-light:      #121212;
+  --on-light-60:   rgba(0,0,0,.60);
+  --on-light-40:   rgba(0,0,0,.40);
+  --hair:          rgba(0,0,0,.12);
+
+  --display: Sentient, 'Times New Roman', Georgia, serif;
+  --text:    'General Sans', -apple-system, 'Segoe UI', Arial, sans-serif;
+
+  --frame: 14px;   /* the inset that makes a dark panel read as a plate */
+  --r: 14px;
+}
+
+:where(.ws) *, :where(.ws) *::before, :where(.ws) *::after { box-sizing: border-box; }
+
+/* :where() AND NOT .ws, AND IT IS LOAD-BEARING.
+
+   `.ws` carries specificity (0,1,0), which out-ranks a page's own
+   `body { ... }` rules at (0,0,1). As `.ws` this block broke two things in
+   one afternoon, neither of them visible in a diff:
+
+     * `margin: 0` beat `body { max-width: 900px; margin: 0 auto }`, so the
+       console stopped centring and sat against the left edge of every wide
+       screen;
+     * `background: var(--page)` beat `body { background: var(--bg) }`, so
+       switching the console or the pod to dark turned every card dark and
+       left the page behind them light. Light text on a light ground, with
+       nothing in any file looking wrong.
+
+   Both are the same defect: a base layer is supposed to be the thing a page
+   overrides, and a class selector is not. :where() is specificity zero, so
+   any page rule wins by default and nothing has to remember this.
+
+   The TOKEN declarations below keep real specificity on purpose -- those are
+   meant to be overridden deliberately, by `.ws.console` and friends, not
+   accidentally by an element selector. */
+:where(.ws) {
+  background: var(--page);
+  color: var(--on-light);
+  font-family: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+}
+
+/* ---------- primitives ---------- */
+
+.ws .plate {
+  background: var(--dark);
+  color: var(--on-dark);
+  border-radius: var(--r);
+  position: relative;
+  overflow: hidden;
+}
+
+.ws .display {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+  margin: 0;
+}
+.ws .d-xl { font-size: clamp(44px, 6.2vw, 92px); }
+.ws .d-lg { font-size: clamp(34px, 4.2vw, 58px); }
+.ws .d-md { font-size: clamp(24px, 2.6vw, 34px); }
+
+/* the label voice: everything instrumental is set this way */
+.ws .label {
+  font-family: var(--text);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
