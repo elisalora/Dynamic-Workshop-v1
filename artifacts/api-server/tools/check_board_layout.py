@@ -71,6 +71,17 @@ MORE_PROMPTS = REVEAL_PROMPTS + [
 ]
 PROMPT_COUNTS = [0, 1, 3]
 
+# Walked upward to find where the layout actually gives out, so the headroom
+# is a measured number instead of an assertion. Distinct strings: a repeated
+# one could wrap differently and make the count mean something else.
+HEADROOM_PROMPTS = REVEAL_PROMPTS + [
+    "Who in this room has the authority and has not used it?",
+    "What did the quiet table say that nobody wrote down?",
+    "Which decision is waiting on a person who is not here?",
+    "What would you stop doing if nobody were watching?",
+    "Name the assumption every table made without saying it.",
+]
+
 # The derivation claims to hold for any grid. These are the three that matter:
 # what main ships, what board-format.ts targets, and one in between that no
 # file anywhere declares — so a derivation that secretly special-cases the
@@ -328,9 +339,9 @@ def main():
             rep.check(False, "both ends rendered", "cannot compare scaling")
 
         # --- the derivation, exercised ---------------------------------
-        # --extras claims to be independent of the grid and to cover up to
-        # three prompts. Both are claims about cases nobody has rendered, so
-        # render them. 1920x1080 only: the scaling property is already proved
+        # --chrome claims to be a height independent of the grid, covering
+        # the masthead, up to three prompts and the footer. Both halves are
+        # claims about cases nobody has rendered, so render them. 1920x1080 only: the scaling property is already proved
         # above, and what is under test here is the arithmetic.
         W, H = 1920, 1080
         print(f"\ngrid geometries at {W}x{H}")
@@ -360,15 +371,35 @@ def main():
             rep.check(m["promptCount"] == n,
                       f"{n} prompt(s) all rendered", f"{m['promptCount']} of {n}")
 
-        # The budget says "up to three". Prove the ceiling is real rather than
-        # decorative: five must NOT fit. A budget that silently absorbs any
-        # number of prompts is not a budget.
-        page_x = stage(tmp, prompts=MORE_PROMPTS[:5], name="pc5")
-        m = render(page_x, W, H)
-        rep.check(m is not None and m["scrollH"] > m["viewportH"] + 1,
-                  "the three-prompt ceiling is real",
-                  "five prompts overflow, as --extras says they should"
-                  if m else "probe never reported")
+        # How much headroom the budget actually has, as a measured number
+        # rather than a claim.
+        #
+        # This check used to assert the opposite -- that five prompts must
+        # NOT fit, proving the ceiling was real. That was a true property of
+        # the OLD derivation, where the furniture was a count of tiles and
+        # grew with the grid. Under a fixed --chrome the plate is capped at
+        # 94vw and there is genuine slack, so five fitting is correct
+        # behaviour, not a defect. An assertion that outlives the design it
+        # described is worse than no assertion: it fails on healthy code and
+        # teaches you to ignore it.
+        #
+        # What is still worth guarding is that the budget clears what the
+        # product needs. So: walk up until something overflows, report where,
+        # and fail if that is under three.
+        print(f"\nprompt headroom at {W}x{H}")
+        max_fit = None
+        for n in range(0, len(HEADROOM_PROMPTS) + 1):
+            mp = render(stage(tmp, prompts=HEADROOM_PROMPTS[:n], name=f"hr{n}"), W, H)
+            if mp is None:
+                break
+            if mp["scrollH"] > mp["viewportH"] + 1:
+                break
+            max_fit = n
+        rep.check(max_fit is not None and max_fit >= 3,
+                  "budget clears the three prompts the product sends",
+                  f"largest prompt count that fits: {max_fit}"
+                  + ("" if max_fit is None else
+                     f" (needs 3; {max_fit - 3} spare)" if max_fit >= 3 else " (SHORT)"))
     finally:
         if keep:
             print(f"\nstaging kept at {tmp}")
@@ -380,4 +411,19 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # An uncaught exception exits 1 by default, and 1 is this tool's code for
+    # "a check failed" -- so a crash would arrive looking exactly like a real
+    # finding. It happened: a stray line referencing a variable that does not
+    # exist in this module raised UnboundLocalError after the last check and
+    # reported as a failure. 2 means "could not run", which is the truth.
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        print("\nFATAL: the guard itself crashed. Exit 2 (could not run), NOT 1 "
+              "(a check failed) — this run says nothing about the board.",
+              file=sys.stderr)
+        sys.exit(2)

@@ -30,45 +30,63 @@
      ============================================================ */
 
   .ws.ws-stage {
-    /* Grid geometry. ONE declaration, read by CSS and by the script
-       below through getComputedStyle — not two constants that agree
-       today.
+    /* Grid geometry. ONE declaration, read by CSS and by the script below
+       through getComputedStyle — not two constants that agree today.
 
-       SEAM, open: artifacts/api-server/src/board-format.ts (Marzipan,
-       branch honey/board-topic-fit) declares BOARD_ROWS=3 BOARD_COLS=15
-       and wraps topic text to that, deliberately targeting the smaller
-       Vestaboard Note so a topic fits either board. This display is the
-       flagship 6x22, which is what main ships. The two disagree and
-       neither file knows it. Left at 6x22 so this pass changes no
-       behaviour; raised rather than decided. */
-    --cols: 22;
-    --rows: 6;
+       3 rows x 15 columns is the **Vestaboard Note**, a real product:
+       https://www.vestaboard.com/help/dimensions-note
+
+       It is also exactly what artifacts/api-server/src/board-format.ts
+       declares, so the seam this pass raised is now closed: the module that
+       formats a topic and the display that draws it agree, rather than each
+       being right on its own. That module asks the model for 32 characters
+       or fewer, verifies with fitsOnBoard(), allows one rewrite, and then
+       DROPS a topic that still will not fit rather than cutting it down — so
+       nothing longer than this grid can ever arrive, and a larger display
+       would have had rows that could never light up.
+
+       IF A PHYSICAL BOARD IS EVER BOUGHT: the flagship Vestaboard is 6 x 22.
+       Changing these two numbers is the whole display change — everything
+       here derives from them, and the guard proves the layout at 3x15, 4x18
+       and 6x22. BOARD_ROWS / BOARD_COLS in board-format.ts must move in the
+       same commit, or the generator and the board disagree again. */
+    --cols: 15;
+    --rows: 3;
 
     --tile-ar: 0.65;                 /* w/h of one flap */
 
-    /* Everything outside the plate -- masthead, the gap under it, up to three
-       prompts, the footer -- is expressed in multiples of --cell, and they add
-       up to this many. Measured off a render, not guessed, and re-measured by
-       the guard at four prompt counts and three grid geometries.
+    /* THE PLATE IS SIZED AGAINST WHAT IS LEFT, AND THE FURNITURE NO LONGER
+       SCALES WITH THE TILE.
 
-       It deliberately does NOT depend on --rows or --cols. The first version
-       of this fix was a flat vh constant, tuned by hand against the 6x22 grid.
-       It was correct, and it was a trap: dropping in the 3x15 geometry that
-       board-format.ts targets pushed the prompts straight back off the bottom,
-       because a height budget tuned for one geometry says nothing about the
-       next one. (Named rather than quoted: this file's own guard greps for the
-       old token, and a comment reproducing it would fail as an assertion.) */
-    --extras: 8.52;
+       Everything outside the plate -- masthead, the gap under it, up to three
+       prompts, the footer -- is set in viewport units below, so --chrome is a
+       height and not a multiple of --cell. That is the fix for a real
+       regression: when the grid went from 6x22 to 3x15 the tile got bigger,
+       the furniture got bigger with it, and the plate was squeezed from 64%
+       of the screen down to 59% -- the grid change made the headline bigger
+       and the board smaller at the same time.
 
-    /* As wide as the plate can be while everything still fits:
-         plate height    = board_w * rows / (cols * tile_ar)
-         everything else = extras * cell = extras * board_w / cols
-       solved for board_w against the viewport height. One expression, no magic
-       number per geometry. The var() fallbacks at the use sites cover a browser
-       without CSS Values 4 division (pre Chrome 111 / Safari 16.4), where this
-       declaration is invalid and --board-w simply never resolves. */
-    --board-w: min(94vw, calc(100vh * var(--cols)
-                              / (var(--rows) / var(--tile-ar) + var(--extras))));
+       Two versions of this were wrong before this one. A flat vh constant
+       tuned by hand against 6x22 pushed the prompts off the bottom the moment
+       the geometry changed. Expressing the furniture as a count of tiles
+       fixed that and introduced this. A height that does not mention the grid
+       at all is the thing that is true for both.
+
+       The value is measured off a render, not guessed. 28vh was the first
+       measurement and it was 2vh short: the furniture's clamps hit their
+       minimums on a small viewport, so the chrome is proportionally TALLER
+       in vh terms there, and 6x22 overflowed a 1080p screen by 21px while
+       3x15 fitted. A height budget has to clear its worst case, which is the
+       smallest display and the tallest grid, not the one in front of you.
+       check_board_layout.py re-measures it at five display sizes, three grid
+       geometries and four prompt counts. */
+    --chrome: 32vh;
+
+    /* As wide as the plate can be in the space left over, capped at 94vw.
+       The var() fallbacks at the use sites cover a browser without CSS
+       Values 4 division (pre Chrome 111 / Safari 16.4). */
+    --ar: calc(var(--cols) * var(--tile-ar) / var(--rows));
+    --board-w: min(94vw, calc((100vh - var(--chrome)) * var(--ar)));
     --cell: calc(var(--board-w) / var(--cols));
     --gap: calc(var(--cell) * 0.06);
 
@@ -93,12 +111,12 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 2vw;
-    padding: calc(var(--cell) * 0.6) calc(var(--cell) * 0.8);
+    padding: 1.6vh clamp(14px, 2.2vw, 48px);
     border-bottom: 1px solid var(--on-dark-10);
     flex: 0 0 auto;
   }
   .ws-stage .masthead .label {
-    font-size: calc(var(--cell) * 0.28);
+    font-size: clamp(10px, 1.5vh, 22px);
     color: var(--on-dark-50);
     letter-spacing: 0.22em;
   }
@@ -108,7 +126,7 @@
   }
   .ws-stage #clock {
     font-family: var(--display);
-    font-size: calc(var(--cell) * 0.52);
+    font-size: clamp(18px, 2.8vh, 42px);
     letter-spacing: -0.01em;
     color: var(--on-dark-50);
     font-variant-numeric: tabular-nums;
@@ -120,8 +138,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: calc(var(--cell) * 0.75);
-    padding: calc(var(--cell) * 0.5) 0;
+    gap: 2.2vh;
+    padding: 1.5vh 0;
     min-height: 0;
   }
 
@@ -199,19 +217,19 @@
     max-width: 94vw;
     display: flex;
     flex-direction: column;
-    gap: calc(var(--cell) * 0.18);
+    gap: 0.8vh;
     flex: 0 0 auto;
   }
   .ws-stage .prompt-item {
     font-family: var(--text);
     font-weight: 400;
-    font-size: calc(var(--cell) * 0.4);
+    font-size: clamp(13px, 2.4vh, 34px);
     line-height: 1.45;
     color: var(--on-dark-75);
-    padding-left: calc(var(--cell) * 0.9);
+    padding-left: clamp(18px, 3.2vh, 46px);
     position: relative;
     opacity: 0;
-    transform: translateY(calc(var(--cell) * 0.2));
+    transform: translateY(0.8vh);
     transition: opacity .5s ease, transform .5s ease;
   }
   .ws-stage .prompt-item.visible { opacity: 1; transform: translateY(0); }
@@ -220,8 +238,8 @@
     position: absolute;
     left: 0;
     top: 0.62em;
-    width: calc(var(--cell) * 0.5);
-    height: max(2px, calc(var(--cell) * 0.045));
+    width: clamp(10px, 1.8vh, 26px);
+    height: max(2px, 0.28vh);
     background: var(--cardinal-lift);
   }
 
@@ -233,15 +251,15 @@
   .ws-stage .footer {
     display: flex;
     align-items: center;
-    gap: calc(var(--cell) * 0.5);
-    padding: calc(var(--cell) * 0.5) calc(var(--cell) * 0.8);
+    gap: 1.2vh;
+    padding: 1.4vh clamp(14px, 2.2vw, 48px);
     border-top: 1px solid var(--on-dark-10);
     flex: 0 0 auto;
   }
   .ws-stage #board-status {
     font-family: var(--text);
     font-weight: 500;
-    font-size: calc(var(--cell) * 0.28);
+    font-size: clamp(10px, 1.4vh, 20px);
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--on-dark-50);
@@ -249,15 +267,15 @@
   .ws-stage #board-status.alert { color: var(--cardinal-lift); }
 
   .ws-stage .lamp {
-    width: calc(var(--cell) * 0.2);
-    height: calc(var(--cell) * 0.2);
+    width: clamp(7px, 1.1vh, 16px);
+    height: clamp(7px, 1.1vh, 16px);
     border-radius: 50%;
     background: var(--on-dark-25);
     flex: 0 0 auto;
   }
   .ws-stage .lamp.live {
     background: var(--cardinal-lift);
-    box-shadow: 0 0 calc(var(--cell) * 0.4) var(--cardinal-lift);
+    box-shadow: 0 0 1.2vh var(--cardinal-lift);
     animation: ws-pulse 2.4s ease-in-out infinite;
   }
   @keyframes ws-pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }

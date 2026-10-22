@@ -78,9 +78,11 @@ def mut_fixed_board_width(pub):
 def mut_overflow(pub):
     """The first fix's bug: a height budget that pushes the status line and
     the third prompt off a 1080p screen."""
-    # The budget is derived now, so the way to break it is to understate
-    # the furniture rather than to mistune a vh constant.
-    sub(pub / "board.html", "--extras: 8.52;", "--extras: 3.0;")
+    # The furniture is a fixed height now, so the way to break it is to
+    # understate that height. 12vh is roughly the first measurement minus the
+    # prompts, i.e. exactly the mistake of budgeting for the chrome you can
+    # see and forgetting the block underneath it.
+    sub(pub / "board.html", "--chrome: 32vh;", "--chrome: 12vh;")
 
 
 def mut_low_contrast_prompts(pub):

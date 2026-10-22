@@ -18,7 +18,7 @@ self-hosted in `fonts/`. No build step, no CDN.
 **Before you change anything, run the guards** from `artifacts/api-server`:
 
 ```
-python3 tools/check_board_layout.py       # 58 checks: the projected display
+python3 tools/check_board_layout.py       # the projected display
 python3 tools/check_token_resolution.py   # 34 checks: the system holds together
 ```
 
@@ -67,29 +67,49 @@ which derives from the viewport. The old headline was `clamp(0.7rem, 2.2vw, 1.3r
 which saturates at its ceiling above ~945px wide, so every projector at every
 resolution drew 20.8px letters.
 
-**`--extras` is the height budget and it does not depend on the grid.** It is the sum
-of everything outside the plate, in multiples of `--cell`. The first version of this
-fix was a flat `vh` constant tuned by hand against the 6x22 grid; correct, and a trap,
-because the 3x15 geometry `board-format.ts` targets pushed the prompts straight back
-off the bottom. The guard re-measures it at three geometries and four prompt counts.
+**`--chrome` is a height, and the furniture does not scale with the tile.** Everything
+outside the plate is set in viewport units, so the plate gets whatever is left and the
+grid can change without the furniture moving. Three versions of this were needed:
+
+1. a flat `vh` constant tuned by hand against 6x22 — pushed the prompts off the bottom
+   the moment the geometry changed;
+2. the furniture expressed as a count of `--cell` — fixed that, and introduced the
+   opposite problem: at 3x15 the tile is bigger, so the furniture grew with it and
+   squeezed the plate from 64% of the screen to 59%. The grid change made the headline
+   bigger and the board smaller at the same time;
+3. a height that does not mention the grid at all. The plate is now **94% of the screen
+   at every size tested**, and the guard re-measures the budget at five display sizes,
+   three geometries and four prompt counts.
+
+`--chrome: 32vh` is measured, not chosen. 28vh was the first measurement and was 2vh
+short: the furniture's clamps hit their minimums on a small viewport, so the chrome is
+proportionally *taller* in `vh` there. A height budget has to clear its worst case —
+the smallest display and the tallest grid — not the one in front of you.
 
 **Name a retired literal, do not quote it.** Three times in this pass a comment
 explaining a defect reproduced its hex or token name, and the guard that greps for that
 literal read the comment as the defect. The guards strip comments before scanning now,
 and the comments say what the old value was without writing it.
 
-## Open: the board geometry seam
+## The board geometry — settled 5 Oct 2026
 
-`board.html` renders 6 rows x 22 columns, the flagship Vestaboard, which is what `main`
-ships. `artifacts/api-server/src/board-format.ts` on branch `honey/board-topic-fit`
-declares `BOARD_ROWS = 3`, `BOARD_COLS = 15` — the smaller Note — and wraps topic text
-to it, so that a topic fits either board. That reasoning is sound and the two files
-still disagree, and neither knows it.
+**3 rows x 15 columns**, the Vestaboard Note. Elisabeth's call, and it closes the seam:
+`artifacts/api-server/src/board-format.ts` declares the same numbers, so the module that
+formats a topic and the display that draws it now agree rather than each being right on
+its own.
 
-Left at 6x22 here so this pass changes no behaviour. It is raised, not decided, because
-the choice is a product one: at 3x15 the same vertical budget gives a headline roughly
-twice the size, and the four permanently-empty rows go away. The layout is already
-proved at both.
+The 6x22 in the original came from an intention to drive a **physical** Vestaboard, whose
+flagship is that size. No board has been bought. What decided it in software: that module
+asks the model for 32 characters or fewer, verifies with `fitsOnBoard()`, allows one
+rewrite, and then **drops** a topic that still will not fit rather than cutting it down —
+so nothing longer than 3x15 can ever arrive, and 87 of a 6x22 board's 132 tiles could
+never light up.
+
+**If a physical board is ever bought:** `--cols` and `--rows` in `board.html` are one
+declaration, read by both the CSS and the script, and the guard proves the layout at
+3x15, 4x18 and 6x22. `BOARD_ROWS` / `BOARD_COLS` in `board-format.ts` must change in the
+same commit, or the generator and the board disagree again — which is the exact state
+this pass found them in.
 
 ## Known, not changed
 
