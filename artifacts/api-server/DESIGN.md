@@ -111,6 +111,43 @@ declaration, read by both the CSS and the script, and the guard proves the layou
 same commit, or the generator and the board disagree again — which is the exact state
 this pass found them in.
 
+## The console, Rev. B — 22 Oct 2026
+
+**Look at it populated before changing it.** The console builds everything from a
+WebSocket snapshot behind Clerk, so every earlier pass only ever saw the empty state.
+
+    python3 tools/render_console.py OUT.png [--theme dark] [--expand t1] [--width 390]
+
+stages `public/`, stubs `auth/config`, `ws-ticket` and the socket, and feeds
+`tools/console_fixture.json` (the exact shape `consoleSnapshot()` emits) to the shipped page.
+Two harness facts, both measured: headless Chrome does not advance CSS animations (cards
+sat at opacity 0, mid-`fadeIn`, 2.5s in), so the harness finishes them; and it will not make
+a window narrower than 500px, so below that the page goes in an iframe of the true width.
+
+What the populated render showed, and what changed:
+
+- **The reveal was ~1,700px down the page**, under search. It is now a sticky rail on the
+  right (first, on a phone): `Themes for the board`, then search.
+- **Purple meant both "session" and "converging".** Sessions are neutral now; the four
+  statuses own the four state colours through one token, `--st`, set by `.is-<status>`.
+- **Tables are tiles whose edge is the status.** Quiet is also hollow and hatched, so it
+  does not depend on hue. Each session header carries a tally, quiet and circling first,
+  because those are the tables to walk over to.
+- **Rename / Logo / Delete sit behind one More menu.** `▦ Board` is the filled button.
+
+Bugs fixed in the same pass, each reproduced in the harness first:
+
+- **Every session and workshop header button was dead** — Rename, Delete, ✦ Summary, ↺,
+  ＋ Session, Logo, and the "Summary available" bar. An inline
+  `onclick="event.stopPropagation()"` on the button row stopped the click before the
+  delegated handler on the folder could see it. In the code since July.
+- On a phone those same buttons ran off the right edge (measured: 9 elements past 390px).
+- `No cross-table themes detected yet.` stayed on screen above the first real theme.
+- `Edit + Reveal` pre-filled the prompt with the candidate ID, `<sessionId>::<topic>`.
+- The search placeholder rendered as `e.g.` — raw `"` inside a `"`-quoted attribute.
+
+Every label `GUIDES/RUNNING_A_WORKSHOP.md` names is unchanged, so the guide still matches.
+
 ## Known, not changed
 
 - `pod.html`'s Chatham House notice contains an em dash. Product copy, not mine to

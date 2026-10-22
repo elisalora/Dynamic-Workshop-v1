@@ -1116,6 +1116,202 @@
     margin: 0.5rem 0;
     font-size: 0.85rem;
   }
+
+  /* ================================================================
+     REV. B — THE CONSOLE AS A DECK (Pom Pom, 2026-10-22)
+
+     Drawn against a POPULATED render for the first time
+     (tools/render_console.py + tools/console_fixture.json); every
+     earlier pass saw only the empty state. What that render showed:
+
+     - The one action the room is waiting on, revealing a theme, sat
+       below the search box, ~1,700px down a 1440px-wide screen.
+     - The page was capped at 900px, so on a laptop a third of the
+       screen was margin while the tables scrolled.
+     - Purple was doing two jobs: "this is a session" and "this table
+       is converging". Hue carried no information. Sessions are now
+       neutral and purple means converging, only.
+     - Six tables as six full-width rows, each truncated to one line.
+
+     So: two columns on a wide screen, the reveal rail sticky on the
+     right; tables as a grid of tiles whose STATUS IS THE EDGE (colour
+     plus, for quiet, a hatch, so it survives a glance and a projector);
+     set-up actions behind one More menu. Same quiet register as
+     before: the board is the theatre, this is the instrument.
+
+     Appended as one block, last in the cascade, so it reviews as a
+     unit and the rules above it stay as they were.
+     ================================================================ */
+
+  body { max-width: 1400px; padding: clamp(1rem, 2.4vw, 2rem); }
+
+  /* Masthead: one hard mark under the title, the system's vector-over-ground. */
+  header { border-bottom: 1px solid var(--border); padding-bottom: 1.1rem; margin-bottom: 1.75rem; position: relative; }
+  header::after {
+    content: ""; position: absolute; left: 0; bottom: -2px;
+    width: 3.5rem; height: 3px; background: var(--accent);
+  }
+  header h1 { font-size: clamp(1.6rem, 2.4vw, 2.25rem); letter-spacing: -0.02em; }
+
+  /* ── Layout ── */
+  .deck { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.75rem; }
+  .rail { order: -1; display: flex; flex-direction: column; gap: 1.5rem; }
+  @media (min-width: 1100px) {
+    .deck { grid-template-columns: minmax(0, 1fr) 24rem; gap: 2.25rem; align-items: start; }
+    .rail {
+      order: 0; position: sticky; top: 1rem;
+      max-height: calc(100vh - 2rem); overflow-y: auto;
+      padding-right: 2px; /* room for focus rings against the scroll edge */
+    }
+  }
+  #groups-section, #candidates-section, #search-section { margin: 0; }
+
+  /* ── Workshop: a section of the page, not a box inside a box ── */
+  .workshop-folder,
+  .workshop-folder:has(.workshop-body.open) { background: none; border: 0; border-radius: 0; overflow: visible; }
+  .workshop-header,
+  .workshop-header:hover {
+    background: none; padding: 0.25rem 0 0.75rem;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap; row-gap: 0.5rem;
+  }
+  .workshop-folder .workshop-name { flex: 1 1 14rem; }
+  .workshop-name { font-family: var(--display); font-weight: 400; font-size: clamp(1.3rem, 1.8vw, 1.6rem); letter-spacing: -0.015em; }
+  .workshop-icon { display: none; }  /* a folder emoji next to a serif title */
+  .workshop-count { background: none; border: 0; padding: 0; font-size: 0.75rem; }
+  .workshop-body-inner { padding: 1rem 0 0; gap: 1rem; }
+  .workshop-add-session-btn {
+    border-color: var(--border); color: var(--muted);
+  }
+  .workshop-add-session-btn:hover { background: var(--surface2); color: var(--ink); }
+
+  /* ── Session: the working card ── */
+  .session-folder,
+  .session-folder:has(.session-body.open) { border: 1px solid var(--border); border-radius: 12px; }
+  .session-header { background: none; padding: 0.85rem 1rem; flex-wrap: wrap; row-gap: 0.5rem; }
+  .session-header:hover { background: var(--surface2); }
+  .session-chevron { color: var(--muted); }
+  .session-name { font-size: 1.05rem; flex: 0 1 auto; }
+  .session-count { background: none; border: 0; color: var(--muted); padding: 0; font-size: 0.75rem; }
+  .session-actions { margin-left: auto; align-items: center; }
+  .session-body { border-top: 1px solid var(--border); }
+  .btn-board, .btn-sm.btn-board { text-decoration: none; background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-board:hover { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+
+  /* Status tally in the session header */
+  .tally { display: inline-flex; flex-wrap: wrap; gap: 0.25rem 0.85rem; font-size: 0.75rem; color: var(--muted); }
+  .tally-item { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+  .tally-item i { width: 8px; height: 8px; border-radius: 2px; background: var(--st); }
+  .tally-item.is-quiet i { background: none; box-shadow: inset 0 0 0 1.5px var(--st); }
+
+  /* ── Status tokens, one place. Shape as well as hue: quiet is hollow and hatched.
+     --st has a page-level default so it always resolves (check_token_resolution
+     reads tokens at the body, and an element that never got a status class
+     should read as quiet, not as no colour at all). ── */
+  .ws.console    { --st: var(--muted); }
+  .is-flowing    { --st: var(--green); }
+  .is-circling   { --st: var(--orange); }
+  .is-converging { --st: var(--purple); }
+  .is-quiet      { --st: var(--muted); }
+
+  /* ── Tables: tiles ── */
+  .session-tables, #tables-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15.5rem, 100%), 1fr));
+    gap: 0.75rem; padding: 1rem;
+  }
+  #tables-grid { padding: 0; }
+  .table-card {
+    border: 1px solid var(--border); border-left: 4px solid var(--st, var(--border));
+    border-radius: 10px;
+  }
+  .table-card:hover { border-color: color-mix(in srgb, var(--ink) 30%, transparent); border-left-color: var(--st); }
+  .table-card.expanded { grid-column: 1 / -1; border-color: var(--ink); border-left-color: var(--st); }
+  .table-card.is-quiet:not(.expanded) {
+    background-image: repeating-linear-gradient(135deg,
+      transparent 0 9px, color-mix(in srgb, var(--ink) 4%, transparent) 9px 10px);
+  }
+
+  .table-card-summary {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "id chip chev" "spark spark spark" "text text text";
+    align-items: center; gap: 0.6rem 0.5rem; padding: 0.9rem 1rem 1rem;
+  }
+  .table-id { grid-area: id; max-width: none; font-size: 1.05rem; font-weight: 600; }
+  .status-chip { grid-area: chip; }
+  .status-chip.flowing, .status-chip.circling, .status-chip.converging, .status-chip.quiet {
+    background: color-mix(in srgb, var(--st) 13%, transparent); color: var(--st);
+  }
+  .status-chip { --st: var(--muted); }
+  .status-chip.flowing { --st: var(--green); }
+  .status-chip.circling { --st: var(--orange); }
+  .status-chip.converging { --st: var(--purple); }
+  .chevron { grid-area: chev; }
+  .sparkline-wrap { grid-area: spark; width: 100%; height: 30px; gap: 3px; }
+  .spark-bar { background: var(--st, var(--accent)); opacity: 0.55; }
+  .spark-bar:last-child { opacity: 1; }  /* now, against the last ten readings */
+  .table-summary-text {
+    grid-area: text; white-space: normal; font-style: normal; color: var(--muted);
+    font-size: 0.82rem; line-height: 1.45;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+    min-height: calc(1.45em * 3);
+  }
+  .table-card.expanded .table-summary-text { -webkit-line-clamp: unset; line-clamp: none; min-height: 0; color: var(--ink); }
+  .table-detail { padding: 0.25rem 1rem 1rem; }
+  .table-card.expanded .table-detail {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr)); gap: 0 2rem;
+  }
+  .table-card.expanded .table-detail > .assign-row,
+  .table-card.expanded .table-detail > .card-bottom-actions { grid-column: 1 / -1; }
+
+  /* Waiting: not live yet, so not solid yet */
+  .waiting-card { border-style: dashed; }
+
+  /* ── The rail ── */
+  .rail .section-header { border-bottom: 0; padding-bottom: 0; margin-bottom: 0.75rem; }
+  .rail .section-title { color: var(--ink); font-weight: 600; }
+  .no-candidates { padding: 0.25rem 0 0; }
+  #candidates-list { gap: 0.6rem; }
+  .candidate-card { border-radius: 10px; padding: 1rem 1rem 1.05rem; }
+  .candidate-card.high,
+  .candidate-card.ready {
+    border-color: var(--accent); border-left: 4px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  }
+  .cand-header { align-items: flex-start; }
+  .cand-topic { font-weight: 600; font-size: 1rem; letter-spacing: 0.04em; line-height: 1.3; text-transform: uppercase; }
+  .conf-badge.low { background: var(--surface2); }
+  .conf-badge.medium { background: color-mix(in srgb, var(--orange) 13%, transparent); }
+  .evidence-chips { flex-direction: column; flex-wrap: nowrap; }
+  .evidence-chip { background: none; border: 0; border-left: 2px solid var(--border); border-radius: 0; padding: 0.1rem 0 0.1rem 0.6rem; font-size: 0.75rem; line-height: 1.4; color: var(--muted); }
+  .evidence-chip .ev-table { display: block; margin: 0 0 0.1rem; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .cand-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .cand-actions .btn-reveal { grid-column: 1 / -1; padding: 0.65rem; font-size: 0.85rem; letter-spacing: 0.02em; }
+  .candidate-card.revealed { opacity: 0.6; padding: 0.7rem 1rem; }
+  .candidate-card.revealed .cand-rationale,
+  .candidate-card.revealed .evidence-chips { display: none; }
+  .candidate-card.revealed .cand-header { margin-bottom: 0.25rem; }
+  .cand-revealed { grid-column: 1 / -1; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+  #search-section { background: none; border: 0; padding: 0; }
+  #search-row { gap: 0.4rem; }
+
+  /* ── More menu ── */
+  details.more { position: relative; }
+  details.more > summary { list-style: none; }
+  details.more > summary::-webkit-details-marker { display: none; }
+  .more-pop {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+    min-width: 9rem; padding: 0.3rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.14);
+    display: flex; flex-direction: column;
+  }
+  .more-pop button {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    padding: 0.45rem 0.65rem; border-radius: 5px; font-size: 0.82rem; color: var(--ink);
+  }
+  .more-pop button:hover, .more-pop button:focus-visible { background: var(--surface2); }
+  .more-pop button.danger { color: var(--red); }
 </style>
 </head>
 <body class="ws console">
@@ -1187,6 +1383,7 @@
   </div>
 </header>
 
+<main class="deck">
 <!-- ── Groups ──────────────────────────────────── -->
 <section id="groups-section">
   <div class="section-header">
@@ -1287,11 +1484,21 @@
   </div>
 </section>
 
-<!-- ── Spawn Candidates ─────────────────────────── -->
+<!-- ── The rail: what goes to the board next, then search. Sticky on a
+     wide screen so the reveal is never more than a glance away; first on a
+     phone, because it is the one thing in the console the room is waiting on. -->
+<aside class="rail">
+<section id="candidates-section">
+  <div class="section-header">
+    <div class="section-title">Themes for the board</div>
+  </div>
+  <div id="candidates-list"><p class="no-candidates">No cross-table themes detected yet.</p></div>
+</section>
+
 <section id="search-section">
   <div class="section-title">Search Discussion</div>
   <div id="search-row">
-    <input id="search-input" type="text" placeholder="e.g. "what did people say about trust?"" autocomplete="off"/>
+    <input id="search-input" type="text" placeholder="e.g. &ldquo;what did people say about trust?&rdquo;" autocomplete="off"/>
     <button id="search-btn">Search</button>
   </div>
   <div id="search-spinner">Searching transcripts…</div>
@@ -1301,12 +1508,8 @@
   </div>
 </section>
 
-<section id="candidates-section">
-  <div class="section-header">
-    <div class="section-title">Spawn Candidates</div>
-  </div>
-  <div id="candidates-list"><p class="no-candidates">No cross-table themes detected yet.</p></div>
-</section>
+</aside>
+</main>
 
 <!-- ── Summary modal ────────────────────────────── -->
 <dialog id="summary-modal">
@@ -1777,11 +1980,12 @@ window._toggleTheme = function() {
             : `<span class="workshop-icon">📁</span>`}
           <span class="workshop-name">${esc(w.name)}</span>
           <span class="workshop-count">${wSessions.length} session${wSessions.length !== 1 ? 's' : ''} · ${totalGroups} group${totalGroups !== 1 ? 's' : ''}</span>
-          <div class="workshop-actions" onclick="event.stopPropagation()">
+          <div class="workshop-actions">
             <button class="btn-sm" data-action="add-session-to-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}" title="Add session">＋ Session</button>
-            <button class="btn-sm" data-action="set-logo-ws" data-wsid="${esc(w.id)}" data-wslogo="${esc(w.logoUrl||'')}" title="Set workshop logo">Logo</button>
-            <button class="btn-sm" data-action="rename-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Rename</button>
-            <button class="btn-sm btn-sm-danger" data-action="delete-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Delete</button>
+            ${moreMenu(`
+              <button data-action="set-logo-ws" data-wsid="${esc(w.id)}" data-wslogo="${esc(w.logoUrl||'')}">Logo</button>
+              <button data-action="rename-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Rename</button>
+              <button class="danger" data-action="delete-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Delete</button>`)}
           </div>
         </div>
         <div class="workshop-body ${isOpen ? 'open' : ''}">
@@ -1864,17 +2068,19 @@ window._toggleTheme = function() {
         <span class="session-chevron ${isOpen ? 'open' : ''}">▶</span>
         <span class="session-name">${esc(s.name)}</span>
         <span class="session-count">${sTables.length} group${sTables.length !== 1 ? 's' : ''}</span>
-        <div class="session-actions" onclick="event.stopPropagation()">
-          <a class="btn-sm" href="${esc(boardUrl(s))}" target="_blank" title="Open the reveal board for this session">▦ Board</a>
+        ${statusTally(sTables)}
+        <div class="session-actions">
           ${hasSummary ? `<button class="btn-sm btn-sm-summary" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">✦ Summary</button>` : ''}
-          <button class="btn-sm btn-sm-primary" data-action="gen-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">${hasSummary ? '↺' : '✦'}</button>
-          <button class="btn-sm" data-action="rename-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Rename</button>
-          <button class="btn-sm btn-sm-danger" data-action="delete-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Delete</button>
+          <button class="btn-sm" data-action="gen-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}" title="${hasSummary ? 'Regenerate the summary' : 'Generate a summary'}">${hasSummary ? '↺' : '✦'}</button>
+          <a class="btn-sm btn-board" href="${esc(boardUrl(s))}" target="_blank" title="Open the reveal board for this session">▦ Board</a>
+          ${moreMenu(`
+            <button data-action="rename-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Rename</button>
+            <button class="danger" data-action="delete-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Delete</button>`)}
         </div>
       </div>
       <div class="session-body ${isOpen ? 'open' : ''}">
         ${hasSummary ? `
-          <div class="session-summary-bar" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}" onclick="event.stopPropagation()">
+          <div class="session-summary-bar" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">
             <span>✦ Summary available</span>
             <span class="sum-date">${formatRelative(s.summaryGeneratedAt)}</span>
           </div>` : ''}
@@ -2053,7 +2259,7 @@ window._toggleTheme = function() {
       const displayName = t.name || t.topic || t.id;
       const podUrl = podLink(t.id, t.joinKey);
 
-      card.className = 'table-card' + (isExpanded ? ' expanded' : '');
+      card.className = `table-card is-${status}` + (isExpanded ? ' expanded' : '');
 
       // Session assign select options
       const sesOptions = `<option value="">— No session —</option>` +
@@ -2259,6 +2465,9 @@ window._toggleTheme = function() {
       list.innerHTML = '<p class="no-candidates">No cross-table themes detected yet.</p>';
       return;
     }
+    // The empty-state line was only ever written, never removed, so the first
+    // theme to arrive appeared directly underneath "No cross-table themes".
+    list.querySelector('.no-candidates')?.remove();
     const existing = {};
     for (const el of list.querySelectorAll('.candidate-card')) existing[el.dataset.id] = el;
 
@@ -2281,9 +2490,9 @@ window._toggleTheme = function() {
         <div class="cand-actions">
           ${c.state !== 'revealed' ? `
             <button class="btn btn-reveal" data-id="${esc(c.id)}" data-action="reveal">Reveal on board</button>
-            <button class="btn btn-edit" data-id="${esc(c.id)}" data-action="edit">Edit + Reveal</button>
+            <button class="btn btn-edit" data-id="${esc(c.id)}" data-topic="${esc(c.topic)}" data-action="edit">Edit + Reveal</button>
             <button class="btn btn-dismiss" data-id="${esc(c.id)}" data-action="dismiss">Dismiss</button>
-          ` : '<span style="color:var(--muted);font-size:0.75rem;font-style:italic;">Revealed</span>'}
+          ` : '<span class="cand-revealed">On the board</span>'}
         </div>`;
     }
     for (const el of Object.values(existing)) el.remove();
@@ -2293,7 +2502,7 @@ window._toggleTheme = function() {
       if (!btn) return;
       const id = btn.dataset.id, action = btn.dataset.action;
       if (action === 'reveal') send({ type: 'reveal', candidateId: id });
-      else if (action === 'edit') { const t = prompt('Edit topic text:', id); if (t !== null) send({ type: 'reveal_custom', candidateId: id, text: t }); }
+      else if (action === 'edit') { const t = prompt('Edit topic text:', btn.dataset.topic || ''); if (t !== null) send({ type: 'reveal_custom', candidateId: id, text: t }); }
       else if (action === 'dismiss') send({ type: 'dismiss', candidateId: id });
     };
   }
@@ -2412,6 +2621,31 @@ window._toggleTheme = function() {
   }
 
   // ── Utilities ──────────────────────────────────────────
+  // Rename / Logo / Delete live behind one More menu: they are set-up actions,
+  // and on a live session they sat at the same weight as ▦ Board. The summary
+  // carries data-action="menu" so the folder's delegated click handlers read
+  // it as an action (and do nothing) instead of collapsing the folder.
+  function moreMenu(items) {
+    return `<details class="more"><summary class="btn-sm" data-action="menu" title="More">More</summary><div class="more-pop">${items}</div></details>`;
+  }
+  document.addEventListener('click', (e) => {
+    for (const d of document.querySelectorAll('details.more[open]')) {
+      if (!d.contains(e.target) || e.target.closest('.more-pop button')) d.open = false;
+    }
+  }, true);  // capture: the folder handlers stopPropagation, so bubbling never arrives
+
+  // One glance per session: how many tables are in each state, in the order a
+  // facilitator acts on them. Quiet and circling first, because those are the
+  // tables to walk over to.
+  const STATUS_ORDER = ['quiet', 'circling', 'flowing', 'converging'];
+  function statusTally(tables) {
+    if (!tables.length) return '';
+    const n = {};
+    for (const t of tables) { const st = t.metrics?.status || 'quiet'; n[st] = (n[st] || 0) + 1; }
+    return `<span class="tally">${STATUS_ORDER.filter(k => n[k]).map(k =>
+      `<span class="tally-item is-${k}"><i></i>${n[k]} ${k}</span>`).join('')}</span>`;
+  }
+
   function copyText(text, btn) {
     navigator.clipboard.writeText(text).then(() => {
       const orig = btn.textContent;
