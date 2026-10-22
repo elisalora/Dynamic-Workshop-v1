@@ -46,7 +46,7 @@ Everything is served under the `/api/` path prefix. `/` redirects to the console
 |-----|--------------|
 | `/api/console.html` | **The facilitator.** Workshops and sessions, table status, sparklines, one-line AI summaries, theme candidates with evidence, and reveal/dismiss controls. Phone-friendly. Requires sign-in — everything else starts here. |
 | `/api/pod.html?table=<id>&key=<joinKey>` | **The table.** Mic capture and the live scribe board. Warm paper/ink, large type, readable from three metres. Participants need no account. |
-| `/api/board.html?session=<id>&key=<boardKey>` | **The room.** 6×22 split-flap display. Reveals flip in column by column with synthesised clicks. Light by default, dark theme toggle. |
+| `/api/board.html?session=<id>&key=<boardKey>` | **The room.** 3×15 split-flap display (the Vestaboard Note grid, which is what `board-format.ts` sizes topics to). Reveals flip in column by column with synthesised clicks. Dark only: a projected display has one lighting condition. |
 | `/api/admin.html` | **The owner.** User list, role toggles, and a one-off "claim unowned data" action. |
 | `/api/report/<sessionId>` | **Everyone else.** The session write-up, readable with no account. Summary only — never transcripts, boards, or theme evidence. |
 
