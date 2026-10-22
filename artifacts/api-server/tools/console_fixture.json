@@ -1,0 +1,48 @@
+{
+  "_comment": "A populated console snapshot, in the exact shape consoleSnapshot() in src/state.ts emits. Invented content for rendering only. Six live tables across every TableStatus, one waiting group, one archived table, candidates in every state the console shows.",
+  "type": "state",
+  "workshops": [
+    { "id": "w1", "name": "Future of Work Summit", "sessionIds": ["s1", "s2"], "createdAt": 0, "logoUrl": null }
+  ],
+  "sessions": [
+    { "id": "s1", "name": "Morning: What changes first", "workshopId": "w1", "tableIds": ["t1", "t2", "t3", "t4", "t5", "t6"], "createdAt": 0, "summary": null, "summaryGeneratedAt": null, "boardKey": "bk1" },
+    { "id": "s2", "name": "Afternoon: Who decides", "workshopId": "w1", "tableIds": [], "createdAt": 0, "summary": "## Afternoon\n\n- Tables agreed early that **accountability** has to sit with a named person.\n\n> \"If the model is wrong, someone has to own the apology.\"", "summaryGeneratedAt": 1, "boardKey": "bk2" }
+  ],
+  "tables": [
+    { "id": "t1", "name": "Table 1", "topic": "", "questions": ["Which task in your week would you hand off first?", "What would you refuse to hand off?"], "summary": "Arguing that the first thing to automate is scheduling, not judgement. One strong dissent from a nurse manager on shift handover.", "sessionId": "s1", "joinKey": "jk1",
+      "metrics": { "wpmHistory": [40, 62, 88, 95, 110, 104, 120, 131, 118, 126], "currentWpm": 126, "novelty": 0.7, "status": "flowing", "lastSpeechAt": 1 },
+      "board": { "clusters": [ { "id": "c1", "label": "Hand off first", "emphasized": true }, { "id": "c2", "label": "Never hand off", "emphasized": false } ],
+        "ideas": [ { "id": "i1", "clusterId": "c1", "text": "Calendar wrangling and room booking" }, { "id": "i2", "clusterId": "c1", "text": "First drafts of status reports" }, { "id": "i3", "clusterId": "c2", "text": "Shift handover between nurses" } ],
+        "links": [], "quotes": [ { "id": "q1", "text": "Handover is where the patient lives or dies. Nobody is automating that.", "timestamp": 1 } ],
+        "flags": [ { "id": "f1", "kind": "open_question", "text": "Who is liable when the handoff summary is wrong?" } ],
+        "synthesis": "Automate the logistics around care, never the moment care changes hands." } },
+    { "id": "t2", "name": "Table 2", "topic": "", "questions": [], "summary": "Three people keep returning to whether junior roles disappear. Same point, rephrased.", "sessionId": "s1", "joinKey": "jk2",
+      "metrics": { "wpmHistory": [90, 96, 101, 99, 104, 98, 102, 100, 97, 101], "currentWpm": 101, "novelty": 0.12, "status": "circling", "lastSpeechAt": 1 },
+      "board": { "clusters": [], "ideas": [], "links": [], "quotes": [], "flags": [], "synthesis": null } },
+    { "id": "t3", "name": "Table 3", "topic": "", "questions": [], "summary": "Landed on apprenticeship as the answer to the junior-role problem; drafting a one-line recommendation.", "sessionId": "s1", "joinKey": "jk3",
+      "metrics": { "wpmHistory": [70, 85, 92, 80, 76, 60, 55, 48, 52, 44], "currentWpm": 44, "novelty": 0.4, "status": "converging", "lastSpeechAt": 1 },
+      "board": { "clusters": [], "ideas": [], "links": [], "quotes": [], "flags": [], "synthesis": "Replace the entry-level job with a paid apprenticeship." } },
+    { "id": "t4", "name": "Table 4", "topic": "", "questions": [], "summary": "", "sessionId": "s1", "joinKey": "jk4",
+      "metrics": { "wpmHistory": [30, 22, 10, 0, 0, 0, 0, 0, 0, 0], "currentWpm": 0, "novelty": 0, "status": "quiet", "lastSpeechAt": 1 },
+      "board": { "clusters": [], "ideas": [], "links": [], "quotes": [], "flags": [], "synthesis": null } },
+    { "id": "t5", "name": "Ops & Finance", "topic": "", "questions": [], "summary": "Pricing AI work by outcome rather than by hour. Disagreement over who carries the risk.", "sessionId": "s1", "joinKey": "jk5",
+      "metrics": { "wpmHistory": [50, 66, 74, 81, 90, 88, 95, 99, 104, 112], "currentWpm": 112, "novelty": 0.66, "status": "flowing", "lastSpeechAt": 1 },
+      "board": { "clusters": [], "ideas": [], "links": [], "quotes": [], "flags": [], "synthesis": null } },
+    { "id": "t6", "name": "Table 6", "topic": "", "questions": [], "summary": "Trust in vendor claims. Nobody at the table has seen an eval they believed.", "sessionId": "s1", "joinKey": "jk6",
+      "metrics": { "wpmHistory": [20, 35, 48, 60, 72, 70, 68, 75, 80, 77], "currentWpm": 77, "novelty": 0.55, "status": "flowing", "lastSpeechAt": 1 },
+      "board": { "clusters": [], "ideas": [], "links": [], "quotes": [], "flags": [], "synthesis": null } }
+  ],
+  "waitingSessions": [
+    { "tableId": "t7", "name": "Table 7", "questions": ["What would make you trust an AI teammate?"], "createdAt": 0, "joinKey": "jk7" }
+  ],
+  "candidates": [
+    { "id": "Apprenticeships", "sessionId": "s1", "topic": "THE JUNIOR ROLE BECOMES AN APPRENTICESHIP", "rationale": "Tables 2 and 3 independently arrived at replacing entry-level work with structured training.", "confidence": "high", "state": "ready", "seedPrompts": [],
+      "evidence": [ { "table": "Table 3", "quote": "If the grunt work goes, the training has to be on purpose now, not by accident." }, { "table": "Table 2", "quote": "Where does the next senior engineer come from if nobody is junior?" } ] },
+    { "id": "Handover", "sessionId": "s1", "topic": "KEEP HUMANS AT THE HANDOFF", "rationale": "Tables 1 and 6 both drew the line at the moment responsibility changes hands.", "confidence": "medium", "state": "pending", "seedPrompts": [],
+      "evidence": [ { "table": "Table 1", "quote": "Handover is where the patient lives or dies. Nobody is automating that." } ] },
+    { "id": "Outcome", "sessionId": "s1", "topic": "PRICE THE OUTCOME", "rationale": "Ops & Finance and Table 6 converged on outcome pricing.", "confidence": "low", "state": "revealed", "seedPrompts": [], "evidence": [] }
+  ],
+  "archivedTables": [
+    { "id": "t0", "topic": "", "name": "Test table", "summary": "Mic check before doors.", "board": { "clusters": [], "ideas": [], "links": [], "quotes": [], "flags": [], "synthesis": null } }
+  ]
+}

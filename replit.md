@@ -64,7 +64,7 @@ artifacts/api-server/
 └── public/
     ├── pod.html       — Scribe board (warm paper/ink aesthetic)
     ├── console.html   — Facilitator dashboard
-    ├── board.html     — Split-flap reveal board (6×22 tiles)
+    ├── board.html     — Split-flap reveal board (3×15 tiles)
     └── admin.html     — User/role administration
 ```
 

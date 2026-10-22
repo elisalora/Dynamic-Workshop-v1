@@ -5,45 +5,77 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Facilitator Console</title>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('scribe-theme')||'light')</script>
+<link rel="stylesheet" href="./workshop.css"/>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   /* ── Light mode (default) ── */
-  :root {
-    --bg: #f8f5f0;
-    --surface: #ffffff;
-    --surface2: #f2ece4;
-    --border: #e0d4c4;
-    --text: #1a1410;
-    --muted: #7a6a58;
-    --accent: #b07010;
-    --accent2: #c44808;
-    --green: #15803d;
-    --orange: #c2520a;
-    --purple: #6d28d9;
-    --red: #b91c1c;
+  /* The facilitator console. An instrument, read under time pressure by one
+     person who is also walking a room, so it gets the quiet half of the
+     system and no theatre at all.
+
+     An ADAPTER onto workshop.css: every var(--x) call site in the file is
+     untouched and only what the names resolve to has changed. One exception,
+     made deliberately above this block -- the colour token this file called
+     --text is now --ink, because workshop.css uses --text for the font
+     stack. Both would have been in scope and the nearer one wins, so every
+     `color: var(--text)` would have resolved to a font-family string, which
+     is invalid and drops the declaration silently. pod.html already called
+     the same thing --ink.
+
+     WHY THERE IS MORE THAN ONE COLOUR HERE, when the rest of the system
+     spends its whole budget on cardinal: a facilitator scanning six tables
+     needs state at a glance, and green/amber/violet are carrying live, idle
+     and candidate. That is information, not decoration, so it stays -- but
+     muted to sit beside charcoal instead of competing with it, and red is
+     now cardinal itself so the page has one red rather than two. */
+  /* NOTE ON THE SELECTOR, which is load-bearing and was wrong once:
+     these live on .ws (the body), NOT on :root. workshop.css declares
+     --cardinal and the charcoal ramp on .ws, and custom properties inherit
+     downward only -- so an adapter on :root referencing --cardinal resolves
+     to the guaranteed-invalid value, every mapped token becomes invalid, and
+     `background: var(--accent)` silently renders transparent. It is a quiet
+     failure: the text is still there, in white, on white. Caught by looking
+     at a render, not by reading the file. */
+  .ws.console {
+    --bg:       var(--page);
+    --surface:  var(--white);
+    --surface2: var(--light);
+    --border:   var(--hair);
+    --ink:      var(--on-light);
+    --muted:    var(--on-light-60);
+    --accent:   var(--cardinal);
+    --accent2:  var(--cardinal-deep);
+
+    /* state, not brand */
+    --green:  #2f6b4f;
+    --orange: #8a5a1c;
+    --purple: #4b4470;
+    --red:    var(--cardinal);
   }
 
-  /* ── Dark mode ── */
-  html[data-theme="dark"] {
-    --bg: #0d0d0b;
-    --surface: #181816;
-    --surface2: #222220;
-    --border: #2e2e2c;
-    --text: #ede8df;
-    --muted: #88887e;
-    --accent: #f0b429;
-    --accent2: #f97316;
-    --green: #4ade80;
-    --orange: #fb923c;
-    --purple: #a78bfa;
-    --red: #f87171;
+  /* Dark is the same ramp with the ground inverted, not a second brand. */
+  html[data-theme="dark"] .ws.console {
+    --bg:       var(--xdark);
+    --surface:  var(--dark);
+    --surface2: var(--mdark);
+    --border:   var(--mdark);
+    --ink:      var(--on-dark);
+    --muted:    var(--on-dark-50);
+    --accent:   var(--cardinal-lift);
+    --accent2:  var(--cardinal);
+
+    --green:  #6fb391;
+    --orange: #d49a52;
+    --purple: #a79ad6;
+    --red:    var(--cardinal-lift);
   }
 
   body {
     background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--ink);
+    font-family: var(--text);
+    font-variant-numeric: tabular-nums;
     font-size: 14px;
     min-height: 100vh;
     padding: 1rem;
@@ -123,7 +155,7 @@
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto 0.75rem;
   }
-  .auth-welcome-name { font-weight: 700; font-size: 1rem; color: var(--text); margin-bottom: 0.2rem; }
+  .auth-welcome-name { font-weight: 700; font-size: 1rem; color: var(--ink); margin-bottom: 0.2rem; }
   .auth-welcome-email { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.5rem; }
   #btn-continue-session { margin-bottom: 0; }
   .btn-switch-user {
@@ -132,7 +164,7 @@
     margin-top: 0.9rem; text-decoration: underline;
     padding: 0; display: block; width: 100%; text-align: center;
   }
-  .btn-switch-user:hover { color: var(--text); }
+  .btn-switch-user:hover { color: var(--ink); }
   /* Header sign-out */
   #btn-signout {
     padding: 0.3rem 0.75rem; border-radius: 4px;
@@ -154,11 +186,11 @@
     flex-wrap: wrap;
   }
   header h1 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--accent);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-family: var(--display);
+    font-size: 1.35rem;
+    font-weight: 400;
+    color: var(--ink);
+    letter-spacing: -0.015em;
   }
   .header-right { display: flex; align-items: center; gap: 0.75rem; }
   #user-info {
@@ -168,7 +200,7 @@
     font-size: 0.78rem;
     color: var(--muted);
   }
-  #user-name { font-weight: 600; color: var(--text); max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #user-name { font-weight: 600; color: var(--ink); max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .btn-signout {
     background: none;
     border: 1px solid var(--border);
@@ -192,7 +224,7 @@
     font-family: inherit;
     transition: all 0.1s;
   }
-  #theme-toggle:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+  #theme-toggle:hover { background: var(--surface2); color: var(--ink); border-color: var(--accent); }
   .btn-signout:hover { background: rgba(248,113,113,0.1); color: var(--red); border-color: rgba(248,113,113,0.4); }
   #conn-status {
     font-size: 0.75rem;
@@ -237,10 +269,13 @@
   }
   .btn-new-group { background: var(--accent); color: #fff; }
   .btn-new-group:hover { opacity: 0.85; }
-  .btn-new-workshop { background: var(--surface); color: var(--accent); border: 1.5px solid var(--accent); }
-  .btn-new-workshop:hover { background: rgba(240,180,41,0.1); }
-  .btn-new-session { background: var(--surface); color: var(--purple); border: 1.5px solid rgba(167,139,250,0.5); }
-  .btn-new-session:hover { background: rgba(167,139,250,0.1); }
+  .btn-new-workshop { background: var(--surface); color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-new-workshop:hover { background: var(--surface2); }
+  /* Workshop and Session are both secondary and read identically; Group is
+     the frequent action and is the only solid button in the row. Violet is
+     reserved for theme candidates, where it carries state. */
+  .btn-new-session { background: var(--surface); color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-new-session:hover { background: var(--surface2); }
 
   /* ── Forms ──────────────────────────────────── */
   #groups-section { margin-bottom: 1.75rem; }
@@ -253,7 +288,7 @@
     margin-bottom: 0.75rem;
     animation: slideDown 0.2s ease-out;
   }
-  .collapsible-form.session-form { border-color: rgba(167,139,250,0.5); }
+  .collapsible-form.session-form { border-color: color-mix(in srgb, var(--purple) 50%, transparent); }
   .collapsible-form.open { display: block; }
   @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
 
@@ -275,7 +310,7 @@
     font-size: 0.9rem;
     font-family: inherit;
     background: var(--bg);
-    color: var(--text);
+    color: var(--ink);
     transition: border-color 0.15s;
   }
   .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
@@ -348,7 +383,7 @@
     overflow: hidden;
     transition: border-color 0.15s;
   }
-  .workshop-folder:has(.workshop-body.open) { border-color: rgba(240,180,41,0.5); }
+  .workshop-folder:has(.workshop-body.open) { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 
   .workshop-header {
     display: flex;
@@ -357,14 +392,14 @@
     padding: 0.85rem 1rem;
     cursor: pointer;
     user-select: none;
-    background: rgba(240,180,41,0.05);
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
     transition: background 0.1s;
   }
-  .workshop-header:hover { background: rgba(240,180,41,0.1); }
+  .workshop-header:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .workshop-chevron { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; transition: transform 0.18s; }
   .workshop-chevron.open { transform: rotate(90deg); }
   .workshop-icon { font-size: 1.1rem; flex-shrink: 0; }
-  .workshop-name { font-weight: 700; font-size: 1rem; flex: 1; color: var(--text); min-width: 0; }
+  .workshop-name { font-weight: 700; font-size: 1rem; flex: 1; color: var(--ink); min-width: 0; }
   .workshop-logo {
     width: 30px; height: 30px;
     border-radius: 3px;
@@ -391,7 +426,7 @@
   .workshop-add-session-btn {
     width: 100%;
     background: none;
-    border: 1px dashed rgba(167,139,250,0.4);
+    border: 1px dashed color-mix(in srgb, var(--purple) 40%, transparent);
     border-radius: 7px;
     padding: 0.5rem;
     font-size: 0.78rem;
@@ -407,12 +442,12 @@
   /* ── Session folders (middle level) ─────────── */
   .session-folder {
     background: var(--surface);
-    border: 1.5px solid rgba(167,139,250,0.2);
+    border: 1.5px solid color-mix(in srgb, var(--purple) 20%, transparent);
     border-radius: 9px;
     overflow: hidden;
     transition: border-color 0.15s;
   }
-  .session-folder:has(.session-body.open) { border-color: rgba(167,139,250,0.55); }
+  .session-folder:has(.session-body.open) { border-color: color-mix(in srgb, var(--purple) 55.0%, transparent); }
 
   .session-header {
     display: flex;
@@ -421,25 +456,25 @@
     padding: 0.65rem 0.85rem;
     cursor: pointer;
     user-select: none;
-    background: rgba(167,139,250,0.05);
+    background: color-mix(in srgb, var(--purple) 5%, transparent);
     transition: background 0.1s;
   }
-  .session-header:hover { background: rgba(167,139,250,0.1); }
+  .session-header:hover { background: color-mix(in srgb, var(--purple) 10%, transparent); }
   .session-chevron { font-size: 0.7rem; color: var(--purple); flex-shrink: 0; transition: transform 0.18s; }
   .session-chevron.open { transform: rotate(90deg); }
-  .session-name { font-weight: 600; font-size: 0.92rem; flex: 1; color: var(--text); }
+  .session-name { font-weight: 600; font-size: 0.92rem; flex: 1; color: var(--ink); }
   .session-count {
     font-size: 0.65rem;
     color: var(--purple);
-    background: rgba(167,139,250,0.12);
-    border: 1px solid rgba(167,139,250,0.35);
+    background: color-mix(in srgb, var(--purple) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--purple) 35%, transparent);
     border-radius: 100px;
     padding: 0.1rem 0.5rem;
     flex-shrink: 0;
   }
   .session-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
 
-  .session-body { display: none; border-top: 1px solid rgba(167,139,250,0.2); }
+  .session-body { display: none; border-top: 1px solid color-mix(in srgb, var(--purple) 20%, transparent); }
   .session-body.open { display: block; }
   .session-tables { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.65rem 0.85rem; }
   .session-empty {
@@ -532,7 +567,7 @@
     padding: 0.28rem 0.65rem;
     border: 1px solid var(--border);
     background: var(--surface);
-    color: var(--text);
+    color: var(--ink);
     cursor: pointer;
     transition: background 0.12s, color 0.12s, border-color 0.12s;
     white-space: nowrap;
@@ -541,8 +576,8 @@
   .btn-sm-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .btn-sm-primary:hover { opacity: 0.85; background: var(--accent); }
   .btn-sm-danger:hover { background: rgba(248,113,113,0.1); color: var(--red); border-color: rgba(248,113,113,0.4); }
-  .btn-sm-summary { background: rgba(240,180,41,0.1); color: var(--accent); border-color: rgba(240,180,41,0.3); }
-  .btn-sm-summary:hover { background: rgba(240,180,41,0.18); }
+  .btn-sm-summary { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+  .btn-sm-summary:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
   .btn-sm-summary:disabled { opacity: 0.5; cursor: default; }
 
   /* ── Waiting session card ───────────────────── */
@@ -568,14 +603,14 @@
     letter-spacing: 0.1em;
     padding: 0.18rem 0.5rem;
     border-radius: 100px;
-    background: rgba(240,180,41,0.12);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
     color: var(--accent);
     flex-shrink: 0;
   }
   .waiting-id {
     font-size: 0.7rem;
     color: var(--muted);
-    font-family: monospace;
+    font-family: var(--text);
     flex-shrink: 0;
   }
   .btn-delete-waiting {
@@ -601,7 +636,7 @@
   }
   .wq-item {
     font-size: 0.8rem;
-    color: var(--text);
+    color: var(--ink);
     padding-left: 0.9rem;
     position: relative;
     line-height: 1.45;
@@ -620,7 +655,7 @@
   .link-url {
     font-size: 0.75rem;
     color: var(--muted);
-    font-family: monospace;
+    font-family: var(--text);
     flex: 1;
     overflow: hidden;
     white-space: nowrap;
@@ -634,12 +669,12 @@
     padding: 0.25rem 0.6rem;
     font-size: 0.72rem;
     font-weight: 600;
-    color: var(--text);
+    color: var(--ink);
     cursor: pointer;
     transition: background 0.15s;
     font-family: inherit;
   }
-  .btn-copy:hover { background: rgba(240,180,41,0.12); border-color: var(--accent); color: var(--accent); }
+  .btn-copy:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); color: var(--accent); }
   .btn-copy.copied { background: rgba(74,222,128,0.12); border-color: var(--green); color: var(--green); }
 
   /* ── Active table cards ─────────────────────── */
@@ -651,7 +686,7 @@
     cursor: pointer;
     transition: border-color 0.15s;
   }
-  .table-card:hover { border-color: rgba(240,180,41,0.4); }
+  .table-card:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
   .table-card.expanded { border-color: var(--accent); }
 
   .table-card-summary {
@@ -663,7 +698,7 @@
   .table-id {
     font-weight: 700;
     font-size: 0.95rem;
-    color: var(--text);
+    color: var(--ink);
     flex-shrink: 0;
     max-width: 180px;
     overflow: hidden;
@@ -739,12 +774,12 @@
   }
   .cluster-block { margin-bottom: 0.6rem; }
   .cluster-name { font-weight: 600; font-size: 0.85rem; color: var(--accent); margin-bottom: 0.25rem; }
-  .idea-row { font-size: 0.8rem; color: var(--text); padding-left: 0.9rem; line-height: 1.5; position: relative; }
+  .idea-row { font-size: 0.8rem; color: var(--ink); padding-left: 0.9rem; line-height: 1.5; position: relative; }
   .idea-row::before { content: '–'; position: absolute; left: 0; color: var(--muted); }
   .quote-row { font-size: 0.8rem; font-style: italic; border-left: 2px solid var(--border); padding-left: 0.6rem; margin-bottom: 0.35rem; line-height: 1.4; }
   .flag-row { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--surface2); border-radius: 4px; padding: 0.2rem 0.55rem; font-size: 0.75rem; margin: 0.2rem 0.2rem 0 0; }
   .flag-kind { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
-  .synthesis-row { font-size: 0.82rem; background: rgba(240,180,41,0.07); border-left: 3px solid var(--accent); padding: 0.5rem 0.75rem; border-radius: 0 4px 4px 0; line-height: 1.5; }
+  .synthesis-row { font-size: 0.82rem; background: color-mix(in srgb, var(--accent) 7.0%, transparent); border-left: 3px solid var(--accent); padding: 0.5rem 0.75rem; border-radius: 0 4px 4px 0; line-height: 1.5; }
 
   /* Pod link + archive row at bottom of expanded card */
   .card-bottom-actions {
@@ -775,7 +810,7 @@
   .pod-link-url {
     font-size: 0.72rem;
     color: var(--muted);
-    font-family: monospace;
+    font-family: var(--text);
     flex: 1;
     overflow: hidden;
     white-space: nowrap;
@@ -792,7 +827,7 @@
     font-size: 0.8rem;
     font-family: inherit;
     background: var(--bg);
-    color: var(--text);
+    color: var(--ink);
     cursor: pointer;
   }
   .assign-select:focus { outline: none; border-color: var(--purple); }
@@ -830,7 +865,7 @@
     border-top: 1px dashed var(--border);
     margin-top: 0.5rem;
   }
-  .archived-toggle:hover { color: var(--text); }
+  .archived-toggle:hover { color: var(--ink); }
   .archived-toggle-chevron { transition: transform 0.18s; }
   .archived-toggle-chevron.open { transform: rotate(90deg); }
   .archived-badge {
@@ -904,7 +939,7 @@
     font-size: 0.9rem;
     font-family: inherit;
     background: var(--bg);
-    color: var(--text);
+    color: var(--ink);
     transition: border-color 0.15s;
     min-width: 0;
   }
@@ -944,7 +979,7 @@
   #search-result-text {
     font-size: 0.88rem;
     line-height: 1.6;
-    color: var(--text);
+    color: var(--ink);
     white-space: pre-wrap;
   }
   #search-result-text em {
@@ -974,7 +1009,7 @@
   .conf-badge { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; padding: 0.15rem 0.5rem; border-radius: 100px; font-weight: 700; }
   .conf-badge.low    { background: rgba(255,255,255,0.06); color: var(--muted); }
   .conf-badge.medium { background: rgba(249,115,22,0.12); color: var(--orange); }
-  .conf-badge.high   { background: rgba(240,180,41,0.12); color: var(--accent); }
+  .conf-badge.high   { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 
   .cand-rationale { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.6rem; line-height: 1.4; }
   .evidence-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.7rem; }
@@ -986,7 +1021,7 @@
   .btn:hover { opacity: 0.85; }
   .btn:active { transform: scale(0.97); }
   .btn-reveal  { background: var(--accent); color: #fff; }
-  .btn-edit    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-edit    { background: var(--surface2); color: var(--ink); border: 1px solid var(--border); }
   .btn-dismiss { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 
   .no-candidates { color: var(--muted); font-size: 0.85rem; padding: 1rem 0; font-style: italic; }
@@ -999,7 +1034,7 @@
     border-radius: 4px;
     padding: 0;
     background: var(--surface);
-    color: var(--text);
+    color: var(--ink);
     box-shadow: 0 20px 80px rgba(0,0,0,0.7);
     max-width: 740px;
     width: calc(100vw - 2rem);
@@ -1019,7 +1054,7 @@
     flex-shrink: 0;
   }
   .modal-header-text { flex: 1; }
-  .modal-title { font-size: 1.15rem; font-weight: 700; color: var(--text); margin-bottom: 0.2rem; }
+  .modal-title { font-size: 1.15rem; font-weight: 700; color: var(--ink); margin-bottom: 0.2rem; }
   .modal-subtitle { font-size: 0.75rem; color: var(--muted); }
   .modal-close-x {
     background: none;
@@ -1032,12 +1067,12 @@
     flex-shrink: 0;
     transition: color 0.1s, background 0.1s;
   }
-  .modal-close-x:hover { color: var(--text); background: var(--surface2); }
+  .modal-close-x:hover { color: var(--ink); background: var(--surface2); }
   #modal-body {
     flex: 1;
     overflow-y: auto;
     padding: 1.1rem 1.25rem;
-    color: var(--text);
+    color: var(--ink);
     line-height: 1.65;
   }
   .modal-footer {
@@ -1068,7 +1103,7 @@
     border-bottom: 1px solid var(--border);
   }
   .md h2:first-child { margin-top: 0; }
-  .md h3 { font-size: 0.9rem; font-weight: 700; margin: 0.9rem 0 0.3rem; color: var(--text); }
+  .md h3 { font-size: 0.9rem; font-weight: 700; margin: 0.9rem 0 0.3rem; color: var(--ink); }
   .md p { margin-bottom: 0.55rem; font-size: 0.88rem; }
   .md ul { margin: 0.35rem 0 0.55rem 1.2rem; }
   .md li { font-size: 0.88rem; margin-bottom: 0.25rem; }
@@ -1081,9 +1116,205 @@
     margin: 0.5rem 0;
     font-size: 0.85rem;
   }
+
+  /* ================================================================
+     REV. B — THE CONSOLE AS A DECK (Pom Pom, 2026-10-22)
+
+     Drawn against a POPULATED render for the first time
+     (tools/render_console.py + tools/console_fixture.json); every
+     earlier pass saw only the empty state. What that render showed:
+
+     - The one action the room is waiting on, revealing a theme, sat
+       below the search box, ~1,700px down a 1440px-wide screen.
+     - The page was capped at 900px, so on a laptop a third of the
+       screen was margin while the tables scrolled.
+     - Purple was doing two jobs: "this is a session" and "this table
+       is converging". Hue carried no information. Sessions are now
+       neutral and purple means converging, only.
+     - Six tables as six full-width rows, each truncated to one line.
+
+     So: two columns on a wide screen, the reveal rail sticky on the
+     right; tables as a grid of tiles whose STATUS IS THE EDGE (colour
+     plus, for quiet, a hatch, so it survives a glance and a projector);
+     set-up actions behind one More menu. Same quiet register as
+     before: the board is the theatre, this is the instrument.
+
+     Appended as one block, last in the cascade, so it reviews as a
+     unit and the rules above it stay as they were.
+     ================================================================ */
+
+  body { max-width: 1400px; padding: clamp(1rem, 2.4vw, 2rem); }
+
+  /* Masthead: one hard mark under the title, the system's vector-over-ground. */
+  header { border-bottom: 1px solid var(--border); padding-bottom: 1.1rem; margin-bottom: 1.75rem; position: relative; }
+  header::after {
+    content: ""; position: absolute; left: 0; bottom: -2px;
+    width: 3.5rem; height: 3px; background: var(--accent);
+  }
+  header h1 { font-size: clamp(1.6rem, 2.4vw, 2.25rem); letter-spacing: -0.02em; }
+
+  /* ── Layout ── */
+  .deck { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.75rem; }
+  .rail { order: -1; display: flex; flex-direction: column; gap: 1.5rem; }
+  @media (min-width: 1100px) {
+    .deck { grid-template-columns: minmax(0, 1fr) 24rem; gap: 2.25rem; align-items: start; }
+    .rail {
+      order: 0; position: sticky; top: 1rem;
+      max-height: calc(100vh - 2rem); overflow-y: auto;
+      padding-right: 2px; /* room for focus rings against the scroll edge */
+    }
+  }
+  #groups-section, #candidates-section, #search-section { margin: 0; }
+
+  /* ── Workshop: a section of the page, not a box inside a box ── */
+  .workshop-folder,
+  .workshop-folder:has(.workshop-body.open) { background: none; border: 0; border-radius: 0; overflow: visible; }
+  .workshop-header,
+  .workshop-header:hover {
+    background: none; padding: 0.25rem 0 0.75rem;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap; row-gap: 0.5rem;
+  }
+  .workshop-folder .workshop-name { flex: 1 1 14rem; }
+  .workshop-name { font-family: var(--display); font-weight: 400; font-size: clamp(1.3rem, 1.8vw, 1.6rem); letter-spacing: -0.015em; }
+  .workshop-icon { display: none; }  /* a folder emoji next to a serif title */
+  .workshop-count { background: none; border: 0; padding: 0; font-size: 0.75rem; }
+  .workshop-body-inner { padding: 1rem 0 0; gap: 1rem; }
+  .workshop-add-session-btn {
+    border-color: var(--border); color: var(--muted);
+  }
+  .workshop-add-session-btn:hover { background: var(--surface2); color: var(--ink); }
+
+  /* ── Session: the working card ── */
+  .session-folder,
+  .session-folder:has(.session-body.open) { border: 1px solid var(--border); border-radius: 12px; }
+  .session-header { background: none; padding: 0.85rem 1rem; flex-wrap: wrap; row-gap: 0.5rem; }
+  .session-header:hover { background: var(--surface2); }
+  .session-chevron { color: var(--muted); }
+  .session-name { font-size: 1.05rem; flex: 0 1 auto; }
+  .session-count { background: none; border: 0; color: var(--muted); padding: 0; font-size: 0.75rem; }
+  .session-actions { margin-left: auto; align-items: center; }
+  .session-body { border-top: 1px solid var(--border); }
+  .btn-board, .btn-sm.btn-board { text-decoration: none; background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-board:hover { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+
+  /* Status tally in the session header */
+  .tally { display: inline-flex; flex-wrap: wrap; gap: 0.25rem 0.85rem; font-size: 0.75rem; color: var(--muted); }
+  .tally-item { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+  .tally-item i { width: 8px; height: 8px; border-radius: 2px; background: var(--st); }
+  .tally-item.is-quiet i { background: none; box-shadow: inset 0 0 0 1.5px var(--st); }
+
+  /* ── Status tokens, one place. Shape as well as hue: quiet is hollow and hatched.
+     --st has a page-level default so it always resolves (check_token_resolution
+     reads tokens at the body, and an element that never got a status class
+     should read as quiet, not as no colour at all). ── */
+  .ws.console    { --st: var(--muted); }
+  .is-flowing    { --st: var(--green); }
+  .is-circling   { --st: var(--orange); }
+  .is-converging { --st: var(--purple); }
+  .is-quiet      { --st: var(--muted); }
+
+  /* ── Tables: tiles ── */
+  .session-tables, #tables-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15.5rem, 100%), 1fr));
+    gap: 0.75rem; padding: 1rem;
+  }
+  #tables-grid { padding: 0; }
+  .table-card {
+    border: 1px solid var(--border); border-left: 4px solid var(--st, var(--border));
+    border-radius: 10px;
+  }
+  .table-card:hover { border-color: color-mix(in srgb, var(--ink) 30%, transparent); border-left-color: var(--st); }
+  .table-card.expanded { grid-column: 1 / -1; border-color: var(--ink); border-left-color: var(--st); }
+  .table-card.is-quiet:not(.expanded) {
+    background-image: repeating-linear-gradient(135deg,
+      transparent 0 9px, color-mix(in srgb, var(--ink) 4%, transparent) 9px 10px);
+  }
+
+  .table-card-summary {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "id chip chev" "spark spark spark" "text text text";
+    align-items: center; gap: 0.6rem 0.5rem; padding: 0.9rem 1rem 1rem;
+  }
+  .table-id { grid-area: id; max-width: none; font-size: 1.05rem; font-weight: 600; }
+  .status-chip { grid-area: chip; }
+  .status-chip.flowing, .status-chip.circling, .status-chip.converging, .status-chip.quiet {
+    background: color-mix(in srgb, var(--st) 13%, transparent); color: var(--st);
+  }
+  .status-chip { --st: var(--muted); }
+  .status-chip.flowing { --st: var(--green); }
+  .status-chip.circling { --st: var(--orange); }
+  .status-chip.converging { --st: var(--purple); }
+  .chevron { grid-area: chev; }
+  .sparkline-wrap { grid-area: spark; width: 100%; height: 30px; gap: 3px; }
+  .spark-bar { background: var(--st, var(--accent)); opacity: 0.55; }
+  .spark-bar:last-child { opacity: 1; }  /* now, against the last ten readings */
+  .table-summary-text {
+    grid-area: text; white-space: normal; font-style: normal; color: var(--muted);
+    font-size: 0.82rem; line-height: 1.45;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+    min-height: calc(1.45em * 3);
+  }
+  .table-card.expanded .table-summary-text { -webkit-line-clamp: unset; line-clamp: none; min-height: 0; color: var(--ink); }
+  .table-detail { padding: 0.25rem 1rem 1rem; }
+  .table-card.expanded .table-detail {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr)); gap: 0 2rem;
+  }
+  .table-card.expanded .table-detail > .assign-row,
+  .table-card.expanded .table-detail > .card-bottom-actions { grid-column: 1 / -1; }
+
+  /* Waiting: not live yet, so not solid yet */
+  .waiting-card { border-style: dashed; }
+
+  /* ── The rail ── */
+  .rail .section-header { border-bottom: 0; padding-bottom: 0; margin-bottom: 0.75rem; }
+  .rail .section-title { color: var(--ink); font-weight: 600; }
+  .no-candidates { padding: 0.25rem 0 0; }
+  #candidates-list { gap: 0.6rem; }
+  .candidate-card { border-radius: 10px; padding: 1rem 1rem 1.05rem; }
+  .candidate-card.high,
+  .candidate-card.ready {
+    border-color: var(--accent); border-left: 4px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  }
+  .cand-header { align-items: flex-start; }
+  .cand-topic { font-weight: 600; font-size: 1rem; letter-spacing: 0.04em; line-height: 1.3; text-transform: uppercase; }
+  .conf-badge.low { background: var(--surface2); }
+  .conf-badge.medium { background: color-mix(in srgb, var(--orange) 13%, transparent); }
+  .evidence-chips { flex-direction: column; flex-wrap: nowrap; }
+  .evidence-chip { background: none; border: 0; border-left: 2px solid var(--border); border-radius: 0; padding: 0.1rem 0 0.1rem 0.6rem; font-size: 0.75rem; line-height: 1.4; color: var(--muted); }
+  .evidence-chip .ev-table { display: block; margin: 0 0 0.1rem; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .cand-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .cand-actions .btn-reveal { grid-column: 1 / -1; padding: 0.65rem; font-size: 0.85rem; letter-spacing: 0.02em; }
+  .candidate-card.revealed { opacity: 0.6; padding: 0.7rem 1rem; }
+  .candidate-card.revealed .cand-rationale,
+  .candidate-card.revealed .evidence-chips { display: none; }
+  .candidate-card.revealed .cand-header { margin-bottom: 0.25rem; }
+  .cand-revealed { grid-column: 1 / -1; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+  #search-section { background: none; border: 0; padding: 0; }
+  #search-row { gap: 0.4rem; }
+
+  /* ── More menu ── */
+  details.more { position: relative; }
+  details.more > summary { list-style: none; }
+  details.more > summary::-webkit-details-marker { display: none; }
+  .more-pop {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+    min-width: 9rem; padding: 0.3rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.14);
+    display: flex; flex-direction: column;
+  }
+  .more-pop button {
+    all: unset; box-sizing: border-box; cursor: pointer;
+    padding: 0.45rem 0.65rem; border-radius: 5px; font-size: 0.82rem; color: var(--ink);
+  }
+  .more-pop button:hover, .more-pop button:focus-visible { background: var(--surface2); }
+  .more-pop button.danger { color: var(--red); }
 </style>
 </head>
-<body>
+<body class="ws console">
 
 <!-- ── Auth overlay ────────────────────────────── -->
 <div id="auth-overlay">
@@ -1124,20 +1355,20 @@
       display:inline-flex;align-items:center;gap:0.4rem;
       padding:0.35rem 0.75rem;border-radius:4px;
       border:1px solid var(--border);background:var(--surface);
-      color:var(--text);text-decoration:none;font-family:inherit;
+      color:var(--ink);text-decoration:none;font-family:inherit;
       font-size:0.78rem;letter-spacing:0.05em;cursor:pointer;
       white-space:nowrap;transition:background 0.15s;
-    " onmouseover="this.style.background='rgba(240,180,41,0.12)'" onmouseout="this.style.background='var(--surface)'">
+    " onmouseover="this.style.background='color-mix(in srgb, var(--accent) 12%, transparent)'" onmouseout="this.style.background='var(--surface)'">
       ▦ Board
     </a>
     <a href="admin.html" target="_blank" id="btn-admin" style="
       display:none;align-items:center;gap:0.4rem;
       padding:0.35rem 0.75rem;border-radius:4px;
       border:1px solid var(--border);background:var(--surface);
-      color:var(--amber,#f0b429);text-decoration:none;font-family:inherit;
+      color:var(--accent);text-decoration:none;font-family:inherit;
       font-size:0.78rem;letter-spacing:0.05em;cursor:pointer;
       white-space:nowrap;transition:background 0.15s;
-    " onmouseover="this.style.background='rgba(240,180,41,0.12)'" onmouseout="this.style.background='var(--surface)'">
+    " onmouseover="this.style.background='color-mix(in srgb, var(--accent) 12%, transparent)'" onmouseout="this.style.background='var(--surface)'">
       ⚙ Admin
     </a>
     <button id="theme-toggle" onclick="_toggleTheme()">☾ Dark</button>
@@ -1152,6 +1383,7 @@
   </div>
 </header>
 
+<main class="deck">
 <!-- ── Groups ──────────────────────────────────── -->
 <section id="groups-section">
   <div class="section-header">
@@ -1252,11 +1484,21 @@
   </div>
 </section>
 
-<!-- ── Spawn Candidates ─────────────────────────── -->
+<!-- ── The rail: what goes to the board next, then search. Sticky on a
+     wide screen so the reveal is never more than a glance away; first on a
+     phone, because it is the one thing in the console the room is waiting on. -->
+<aside class="rail">
+<section id="candidates-section">
+  <div class="section-header">
+    <div class="section-title">Themes for the board</div>
+  </div>
+  <div id="candidates-list"><p class="no-candidates">No cross-table themes detected yet.</p></div>
+</section>
+
 <section id="search-section">
   <div class="section-title">Search Discussion</div>
   <div id="search-row">
-    <input id="search-input" type="text" placeholder="e.g. "what did people say about trust?"" autocomplete="off"/>
+    <input id="search-input" type="text" placeholder="e.g. &ldquo;what did people say about trust?&rdquo;" autocomplete="off"/>
     <button id="search-btn">Search</button>
   </div>
   <div id="search-spinner">Searching transcripts…</div>
@@ -1266,12 +1508,8 @@
   </div>
 </section>
 
-<section id="candidates-section">
-  <div class="section-header">
-    <div class="section-title">Spawn Candidates</div>
-  </div>
-  <div id="candidates-list"><p class="no-candidates">No cross-table themes detected yet.</p></div>
-</section>
+</aside>
+</main>
 
 <!-- ── Summary modal ────────────────────────────── -->
 <dialog id="summary-modal">
@@ -1742,11 +1980,12 @@ window._toggleTheme = function() {
             : `<span class="workshop-icon">📁</span>`}
           <span class="workshop-name">${esc(w.name)}</span>
           <span class="workshop-count">${wSessions.length} session${wSessions.length !== 1 ? 's' : ''} · ${totalGroups} group${totalGroups !== 1 ? 's' : ''}</span>
-          <div class="workshop-actions" onclick="event.stopPropagation()">
+          <div class="workshop-actions">
             <button class="btn-sm" data-action="add-session-to-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}" title="Add session">＋ Session</button>
-            <button class="btn-sm" data-action="set-logo-ws" data-wsid="${esc(w.id)}" data-wslogo="${esc(w.logoUrl||'')}" title="Set workshop logo">Logo</button>
-            <button class="btn-sm" data-action="rename-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Rename</button>
-            <button class="btn-sm btn-sm-danger" data-action="delete-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Delete</button>
+            ${moreMenu(`
+              <button data-action="set-logo-ws" data-wsid="${esc(w.id)}" data-wslogo="${esc(w.logoUrl||'')}">Logo</button>
+              <button data-action="rename-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Rename</button>
+              <button class="danger" data-action="delete-ws" data-wsid="${esc(w.id)}" data-wsname="${esc(w.name)}">Delete</button>`)}
           </div>
         </div>
         <div class="workshop-body ${isOpen ? 'open' : ''}">
@@ -1829,17 +2068,19 @@ window._toggleTheme = function() {
         <span class="session-chevron ${isOpen ? 'open' : ''}">▶</span>
         <span class="session-name">${esc(s.name)}</span>
         <span class="session-count">${sTables.length} group${sTables.length !== 1 ? 's' : ''}</span>
-        <div class="session-actions" onclick="event.stopPropagation()">
-          <a class="btn-sm" href="${esc(boardUrl(s))}" target="_blank" title="Open the reveal board for this session">▦ Board</a>
+        ${statusTally(sTables)}
+        <div class="session-actions">
           ${hasSummary ? `<button class="btn-sm btn-sm-summary" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">✦ Summary</button>` : ''}
-          <button class="btn-sm btn-sm-primary" data-action="gen-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">${hasSummary ? '↺' : '✦'}</button>
-          <button class="btn-sm" data-action="rename-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Rename</button>
-          <button class="btn-sm btn-sm-danger" data-action="delete-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Delete</button>
+          <button class="btn-sm" data-action="gen-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}" title="${hasSummary ? 'Regenerate the summary' : 'Generate a summary'}">${hasSummary ? '↺' : '✦'}</button>
+          <a class="btn-sm btn-board" href="${esc(boardUrl(s))}" target="_blank" title="Open the reveal board for this session">▦ Board</a>
+          ${moreMenu(`
+            <button data-action="rename-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Rename</button>
+            <button class="danger" data-action="delete-ses" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">Delete</button>`)}
         </div>
       </div>
       <div class="session-body ${isOpen ? 'open' : ''}">
         ${hasSummary ? `
-          <div class="session-summary-bar" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}" onclick="event.stopPropagation()">
+          <div class="session-summary-bar" data-action="view-sum" data-sesid="${esc(s.id)}" data-sesname="${esc(s.name)}">
             <span>✦ Summary available</span>
             <span class="sum-date">${formatRelative(s.summaryGeneratedAt)}</span>
           </div>` : ''}
@@ -2018,7 +2259,7 @@ window._toggleTheme = function() {
       const displayName = t.name || t.topic || t.id;
       const podUrl = podLink(t.id, t.joinKey);
 
-      card.className = 'table-card' + (isExpanded ? ' expanded' : '');
+      card.className = `table-card is-${status}` + (isExpanded ? ' expanded' : '');
 
       // Session assign select options
       const sesOptions = `<option value="">— No session —</option>` +
@@ -2224,6 +2465,9 @@ window._toggleTheme = function() {
       list.innerHTML = '<p class="no-candidates">No cross-table themes detected yet.</p>';
       return;
     }
+    // The empty-state line was only ever written, never removed, so the first
+    // theme to arrive appeared directly underneath "No cross-table themes".
+    list.querySelector('.no-candidates')?.remove();
     const existing = {};
     for (const el of list.querySelectorAll('.candidate-card')) existing[el.dataset.id] = el;
 
@@ -2246,9 +2490,9 @@ window._toggleTheme = function() {
         <div class="cand-actions">
           ${c.state !== 'revealed' ? `
             <button class="btn btn-reveal" data-id="${esc(c.id)}" data-action="reveal">Reveal on board</button>
-            <button class="btn btn-edit" data-id="${esc(c.id)}" data-action="edit">Edit + Reveal</button>
+            <button class="btn btn-edit" data-id="${esc(c.id)}" data-topic="${esc(c.topic)}" data-action="edit">Edit + Reveal</button>
             <button class="btn btn-dismiss" data-id="${esc(c.id)}" data-action="dismiss">Dismiss</button>
-          ` : '<span style="color:var(--muted);font-size:0.75rem;font-style:italic;">Revealed</span>'}
+          ` : '<span class="cand-revealed">On the board</span>'}
         </div>`;
     }
     for (const el of Object.values(existing)) el.remove();
@@ -2258,7 +2502,7 @@ window._toggleTheme = function() {
       if (!btn) return;
       const id = btn.dataset.id, action = btn.dataset.action;
       if (action === 'reveal') send({ type: 'reveal', candidateId: id });
-      else if (action === 'edit') { const t = prompt('Edit topic text:', id); if (t !== null) send({ type: 'reveal_custom', candidateId: id, text: t }); }
+      else if (action === 'edit') { const t = prompt('Edit topic text:', btn.dataset.topic || ''); if (t !== null) send({ type: 'reveal_custom', candidateId: id, text: t }); }
       else if (action === 'dismiss') send({ type: 'dismiss', candidateId: id });
     };
   }
@@ -2377,6 +2621,31 @@ window._toggleTheme = function() {
   }
 
   // ── Utilities ──────────────────────────────────────────
+  // Rename / Logo / Delete live behind one More menu: they are set-up actions,
+  // and on a live session they sat at the same weight as ▦ Board. The summary
+  // carries data-action="menu" so the folder's delegated click handlers read
+  // it as an action (and do nothing) instead of collapsing the folder.
+  function moreMenu(items) {
+    return `<details class="more"><summary class="btn-sm" data-action="menu" title="More">More</summary><div class="more-pop">${items}</div></details>`;
+  }
+  document.addEventListener('click', (e) => {
+    for (const d of document.querySelectorAll('details.more[open]')) {
+      if (!d.contains(e.target) || e.target.closest('.more-pop button')) d.open = false;
+    }
+  }, true);  // capture: the folder handlers stopPropagation, so bubbling never arrives
+
+  // One glance per session: how many tables are in each state, in the order a
+  // facilitator acts on them. Quiet and circling first, because those are the
+  // tables to walk over to.
+  const STATUS_ORDER = ['quiet', 'circling', 'flowing', 'converging'];
+  function statusTally(tables) {
+    if (!tables.length) return '';
+    const n = {};
+    for (const t of tables) { const st = t.metrics?.status || 'quiet'; n[st] = (n[st] || 0) + 1; }
+    return `<span class="tally">${STATUS_ORDER.filter(k => n[k]).map(k =>
+      `<span class="tally-item is-${k}"><i></i>${n[k]} ${k}</span>`).join('')}</span>`;
+  }
+
   function copyText(text, btn) {
     navigator.clipboard.writeText(text).then(() => {
       const orig = btn.textContent;

@@ -5,51 +5,77 @@
 <meta name="viewport" content="width=1920"/>
 <title>Scribe Board</title>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('scribe-theme')||'light')</script>
+<link rel="stylesheet" href="./workshop.css"/>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;600;700&family=Playfair+Display:ital,wght@0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;1,8..60,400&display=swap');
 
   /* ── Light mode (default) ── */
-  :root {
-    --paper:           #f5f0e8;
-    --ink:             #1a1410;
-    --ink-muted:       #6a5a48;
-    --accent:          #b07010;
-    --accent-light:    #d09020;
-    --card-bg:         #faf7f2;
-    --card-border:     #d4c4a8;
-    --quote-bg:        #fff9f0;
-    --syn-bg:          #f0b429;
-    --syn-text:        #1a0800;
-    --flag-bg:         #e8d5b0;
-    --flag-text:       #7a4a0a;
-    --header-surface:  rgba(245,240,232,0.96);
-    --ticker-surface:  #1a1410;
-    --dot-idle:        #c8b8a0;
-    --tile-char:       #1a1410;
-    --tile-cell:       #faf7f2;
+  /* The pod runs on a tablet in the middle of a table. It is an instrument:
+     the people reading it are mid-conversation and glancing down.
+
+     This block is an ADAPTER, not a new palette. Every var(--x) call site in
+     the file is untouched; only what the names resolve to has changed, onto
+     the shared tokens in workshop.css. That keeps the diff small enough to
+     read and means no rule can be quietly missed.
+
+     Gone with it: an @import of four Google families, two of which appear
+     nowhere else in this file -- downloaded per tablet per load and never
+     drawn, and four requests leaking the timing of a private workshop to a
+     third party. The two that were drawn both resolve to General Sans now;
+     the mechanical voice the monospaced one carried is the uppercase label
+     treatment, which is a style rather than a face. */
+  /* NOTE ON THE SELECTOR, which is load-bearing and was wrong once:
+     these live on .ws (the body), NOT on :root. workshop.css declares
+     --cardinal and the charcoal ramp on .ws, and custom properties inherit
+     downward only -- so an adapter on :root referencing --cardinal resolves
+     to the guaranteed-invalid value, every mapped token becomes invalid, and
+     `background: var(--accent)` silently renders transparent. It is a quiet
+     failure: the text is still there, in white, on white. Caught by looking
+     at a render, not by reading the file. */
+  .ws.pod {
+    --paper:           var(--page);
+    --ink:             var(--on-light);
+    --ink-muted:       var(--on-light-60);
+    --accent:          var(--cardinal);
+    --accent-light:    var(--cardinal-deep);
+    --card-bg:         var(--white);
+    --card-border:     var(--hair);
+    --quote-bg:        var(--white);
+    /* Synthesis is the one block on the pod meant to stop a table
+       mid-sentence, so it inverts to a charcoal plate rather than shouting
+       in yellow. The same move the board makes, one register quieter. */
+    --syn-bg:          var(--dark);
+    --syn-text:        var(--on-dark);
+    --flag-bg:         rgba(123,36,28,0.07);
+    --flag-text:       var(--cardinal);
+    --header-surface:  rgba(245,245,244,0.96);
+    --ticker-surface:  var(--dark);
+    --dot-idle:        var(--on-light-40);
+    --tile-char:       var(--on-light);
+    --tile-cell:       var(--white);
     --ticker-h:        3.5rem;
     --header-h:        3.75rem;
   }
 
-  /* ── Dark mode ── */
-  html[data-theme="dark"] {
-    --paper:           #0d0d0b;
-    --ink:             #ede8df;
-    --ink-muted:       #8a8880;
-    --accent:          #f0b429;
-    --accent-light:    #c8941a;
-    --card-bg:         #181816;
-    --card-border:     #2c2c28;
-    --quote-bg:        #1c1c1a;
-    --syn-bg:          #f0b429;
-    --syn-text:        #0d0d00;
-    --flag-bg:         #242420;
-    --flag-text:       #f0b429;
-    --header-surface:  rgba(13,13,11,0.96);
+  /* Dark is not a second brand, it is the same ramp with the ground
+     inverted -- which is why none of the names above change here. */
+  html[data-theme="dark"] .ws.pod {
+    --paper:           var(--xdark);
+    --ink:             var(--on-dark);
+    --ink-muted:       var(--on-dark-50);
+    --accent:          var(--cardinal-lift);
+    --accent-light:    var(--cardinal);
+    --card-bg:         var(--dark);
+    --card-border:     var(--mdark);
+    --quote-bg:        var(--mdark);
+    --syn-bg:          var(--cardinal);
+    --syn-text:        var(--on-dark);
+    --flag-bg:         rgba(196,88,74,0.12);
+    --flag-text:       var(--cardinal-lift);
+    --header-surface:  rgba(18,18,18,0.96);
     --ticker-surface:  #000000;
-    --dot-idle:        #333330;
-    --tile-char:       #f0b429;
-    --tile-cell:       #141412;
+    --dot-idle:        var(--on-dark-25);
+    --tile-char:       var(--on-dark);
+    --tile-cell:       var(--dark);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,7 +85,7 @@
     overflow: hidden;
     background: var(--paper);
     color: var(--ink);
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
   }
 
   /* ─── Ink-wash background canvas ────────────────────── */
@@ -85,12 +111,18 @@
     text-align: center;
     padding: 3rem 4rem;
   }
+  /* The start screen is the one moment the pod is a title card rather than
+     an instrument: a table reads it once, from standing. Display face, at
+     size, in the house's single colour. Uppercase + 0.14em tracking is
+     dropped -- that treatment is the label voice, which is for 11px
+     furniture, not for the largest words on the screen. */
   #start-screen h1 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: clamp(2rem, 5.5vw, 5rem);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent);
+    font-family: var(--display);
+    font-size: clamp(2.4rem, 6vw, 5.5rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.02;
+    color: var(--ink);
   }
   .start-quill {
     opacity: 0.35;
@@ -109,8 +141,8 @@
     max-width: 700px;
     width: 100%;
     text-align: left;
-    background: rgba(240,180,41,0.06);
-    border: 1px solid rgba(240,180,41,0.2);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
     border-radius: 4px;
     padding: 1.25rem 1.5rem;
   }
@@ -124,7 +156,7 @@
     margin-bottom: 0.75rem;
   }
   .sq-item {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-size: clamp(0.95rem, 1.7vw, 1.4rem);
     color: var(--ink);
     line-height: 1.4;
@@ -137,7 +169,7 @@
     position: absolute; left: 0;
     color: var(--accent);
     font-weight: 700;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-size: 0.85em;
     top: 0.1em;
   }
@@ -148,7 +180,7 @@
     color: var(--paper);
     border: none;
     padding: 1.25rem 3.5rem;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-size: clamp(1.1rem, 2.2vw, 1.8rem);
     font-weight: 700;
     border-radius: 5px;
@@ -156,7 +188,7 @@
     letter-spacing: 0.08em;
     transition: background 0.2s, transform 0.1s;
   }
-  #start-btn:hover  { background: #c8941a; }
+  #start-btn:hover  { background: var(--accent-light); }
   #start-btn:active { transform: scale(0.97); }
   #chatham-notice {
     display: flex;
@@ -165,13 +197,13 @@
     max-width: 480px;
     margin: 1.5rem auto 1.1rem;
     padding: 0.85rem 1.1rem;
-    background: rgba(240,180,41,0.06);
-    border: 1px solid rgba(240,180,41,0.2);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
     border-left: 3px solid var(--accent);
     border-radius: 0 4px 4px 0;
     color: var(--ink-muted);
     font-size: clamp(0.75rem, 1.3vw, 0.88rem);
-    font-family: 'Space Mono', monospace;
+    font-family: var(--text);
     line-height: 1.6;
     text-align: left;
   }
@@ -190,7 +222,7 @@
     border-radius: 3px;
     padding: 0.22rem 0.65rem;
     font-size: 0.7rem;
-    font-family: 'Space Mono', monospace;
+    font-family: var(--text);
     letter-spacing: 0.08em;
     color: var(--ink-muted);
     cursor: pointer;
@@ -243,7 +275,7 @@
     transform: scaleX(-1);
   }
   #board-title {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     font-size: clamp(1rem, 2.2vw, 1.8rem);
@@ -261,8 +293,22 @@
     flex-shrink: 0;
     position: relative; z-index: 1;
   }
-  .status-dot.connected { background: #4ade80; }
-  .status-dot.recording { background: var(--accent); animation: blink 1.4s infinite; }
+  /* Three states, and they used to separate on hue alone: grey idle, bright
+     green connected, cardinal recording. The system has no green, and a 10px
+     dot read across a table is the worst place to make hue carry everything.
+     So each state differs in SHAPE as well: idle is filled grey, connected is
+     an empty ring (the socket is up, the mic is not), recording is filled
+     cardinal with a halo and a blink. Cardinal appears on exactly one of
+     them, and it is the one that means you are being recorded. */
+  .status-dot.connected {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--ink-muted);
+  }
+  .status-dot.recording {
+    background: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+    animation: blink 1.4s infinite;
+  }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
   /* ── Synthesis strip ─────────────────────────────────── */
@@ -291,7 +337,7 @@
     white-space: nowrap;
   }
   #synthesis-text {
-    font-family: 'Space Mono', monospace;
+    font-family: var(--text);
     font-size: clamp(0.88rem, 1.6vw, 1.4rem);
     line-height: 1.35;
     flex: 1;
@@ -327,7 +373,7 @@
   }
   .cluster-card.emphasized {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(240,180,41,0.25);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
   }
   /* bloom ring on new card */
   .cluster-card::after {
@@ -335,7 +381,7 @@
     position: absolute;
     inset: 0;
     border-radius: 3px;
-    background: radial-gradient(circle at 50% 50%, rgba(240,180,41,0.12) 0%, transparent 70%);
+    background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 70%);
     pointer-events: none;
     animation: bloomFade 1.2s ease-out forwards;
   }
@@ -353,7 +399,7 @@
   }
 
   .cluster-label {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-weight: 700;
     font-size: clamp(0.95rem, 1.8vw, 1.55rem);
     color: var(--accent);
@@ -421,7 +467,7 @@
   #cluster-grid.overview-mode .more-indicator { display: none !important; }
   #cluster-grid.overview-mode .card-botanical { opacity: .18; }
   .idea-count-badge {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-size: clamp(0.72rem, 1.05vw, 0.88rem);
     color: var(--ink-muted);
     margin-top: 0.3rem;
@@ -469,7 +515,7 @@
     flex-shrink: 0;
   }
   #expand-title {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-weight: 700;
     font-size: clamp(1rem, 2.2vw, 1.8rem);
     color: var(--accent);
@@ -483,7 +529,7 @@
     color: var(--ink-muted);
     border-radius: 4px;
     padding: 0.3rem 0.85rem;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-size: clamp(0.75rem, 1vw, 0.85rem);
     cursor: pointer;
     flex-shrink: 0;
@@ -517,7 +563,7 @@
   /* ── Overview toggle button ──────────────────────────── */
   #overview-btn {
     font-size: clamp(0.6rem, 0.9vw, 0.75rem);
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .1em;
@@ -531,7 +577,7 @@
     flex-shrink: 0;
   }
   #overview-btn:hover { border-color: var(--accent-light); color: var(--accent-light); }
-  #overview-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(240,180,41,0.08); }
+  #overview-btn.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
   /* ── Bottom strip ────────────────────────────────────── */
   #bottom-strip {
@@ -562,7 +608,7 @@
   .quote-pill {
     flex: 1 1 0;
     min-width: 0;
-    font-family: 'Space Mono', monospace;
+    font-family: var(--text);
     font-size: clamp(0.75rem, 1.2vw, 1rem) !important;
     font-size: clamp(0.82rem, 1.4vw, 1.2rem);
     color: var(--ink-muted);
@@ -628,7 +674,7 @@
     border: 1px solid var(--card-border);
     border-radius: 6px;
     padding: 0.4rem 0.75rem;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-size: clamp(0.82rem, 1.3vw, 1rem);
     color: var(--ink);
     outline: none;
@@ -640,7 +686,7 @@
     border: none;
     border-radius: 6px;
     padding: 0.4rem 1rem;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--text);
     font-size: clamp(0.78rem, 1.1vw, 0.9rem);
     font-weight: 600;
     cursor: pointer;
@@ -677,7 +723,7 @@
     flex-shrink: 0;
   }
   #ticker-text {
-    font-family: 'Space Mono', monospace;
+    font-family: var(--text);
     font-size: clamp(0.88rem, 1.55vw, 1.25rem);
     opacity: .82;
     overflow: hidden;
@@ -687,7 +733,7 @@
   }
 </style>
 </head>
-<body>
+<body class="ws pod">
 
 <!-- Ink-wash background -->
 <canvas id="bg-canvas"></canvas>
